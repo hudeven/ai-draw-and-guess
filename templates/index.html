@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>AI Draw and Guess</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+</head>
+<body>
+
+<h1>Welcome to Draw and Guess!</h1>
+
+<input type="text" class="user_name" placeholder="User Name"/>
+<button id="submit">Submit</button>
+
+<script type="text/javascript">
+    $('#submit').on('click', function(e) {
+        e.preventDefault()
+        let user_name = $('input.user_name').val()
+        console.log(user_name)
+        window.location = 'welcome' + "/" + user_name
+    })
+
+</script>
+</body>
+</html>

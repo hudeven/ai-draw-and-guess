@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>AI Draw and Guess</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <script>
+        function guidGenerator(length) {
+            var S4 = function() {
+               return (((1+Math.random())*0x10000)|0).toString(16).substring(1);
+            };
+            return (S4()+S4()+"-"+S4()+"-"+S4()+"-"+S4()+"-"+S4()+S4()+S4()).substring(0, length);
+        }
+
+    </script>
+</head>
+<body>
+<h1>Welcome <span id="user_name">{{ user_name }}</span></h1>
+<button id="create_game">Create a game</button>
+<h3> Or </h3>
+<input type="text" id="game_id" placeholder="Get the game id from your host"/>
+<button id="join_game">Join a game</button>
+
+<script type="text/javascript">
+    $('#create_game').on('click', function(e) {
+        var game_id = guidGenerator(length=4)
+        var user_name = $('#user_name').text()
+        window.location = `/waiting_players/${game_id}/${user_name}`
+    })
+
+    $('#join_game').on('click', function(e) {
+        var game_id = $('#game_id').val()
+        var user_name = $('#user_name').text()
+        window.location = `/waiting_players/${game_id}/${user_name}`
+    })
+
+</script>
+
+</body>
+</html>

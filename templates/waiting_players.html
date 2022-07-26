@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>AI Draw and Guess</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.min.js"></script>
+</head>
+
+<body>
+<h1>
+    Username: <span id="user_name">{{ user_name }}</span>
+    <br>
+    GameId: <span id="game_id">{{ game_id }}</span>
+</h1>
+<h3>Player List</h3>
+<div id="players"></div>
+<br><br><br>
+<button id="start_game">Start Game</button>
+<script type="text/javascript">
+    var game_id = $('#game_id').text()
+    var user_name = $('#user_name').text()
+
+    var socket = io.connect('http://' + document.domain + ':' + location.port);
+    socket.on('connect', function() {
+        socket.emit('join-game-event', {
+            game_id: game_id,
+            user_name: user_name
+        })
+    })
+
+    socket.on('join-game-event-response', function(msg) {
+        // Update players list on every player's page when a player joined the game
+        console.log(msg)
+        if (typeof msg.players !== 'undefined') {
+            $('#players').empty()
+            for (let i = 0; i < msg.players.length; i++) {
+                console.log("add player: " + msg.players[i])
+                $('#players').append('<div><b style="color: #000">' + msg.players[i] + '</b> joined</div>')
+            }
+        } else {
+            console.log("player_list is empty")
+        }
+    })
+
+    $('#start_game').on('click', function(e) {
+        window.location = `/game_loop/${game_id}/${user_name}`
+    })
+
+</script>
+
+</body>
+</html>
