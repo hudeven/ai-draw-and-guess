@@ -11,11 +11,16 @@
     Username: <span id="user_name">{{ user_name }}</span>
     <br>
     GameId: <span id="game_id">{{ game_id }}</span>
+    <br>
+    Creator: <span id="creator">{{ creator }}</span>
 </h1>
 <h3>Player List</h3>
 <div id="players"></div>
 <br><br><br>
-<button id="start_game">Start Game</button>
+
+{% if creator == user_name %}
+    <button id="start_game">Start Game</button>
+{% endif %}
 <script type="text/javascript">
     var game_id = $('#game_id').text()
     var user_name = $('#user_name').text()
@@ -23,8 +28,8 @@
     var socket = io.connect('http://' + document.domain + ':' + location.port);
     socket.on('connect', function() {
         socket.emit('join-game-event', {
-            game_id: game_id,
-            user_name: user_name
+            "game_id": game_id,
+            "user_name": user_name
         })
     })
 
@@ -42,9 +47,16 @@
         }
     })
 
-    $('#start_game').on('click', function(e) {
+    // Navigate every player to game_loop page
+    socket.on('start-game-event-response', function(msg) {
         window.location = `/game_loop/${game_id}/${user_name}`
     })
+
+    // only the host can see "start_game" button and emit this event
+    $('#start_game').on('click', function(e) {
+        socket.emit('start-game-event', {"game_id": game_id})
+    })
+
 
 </script>
 

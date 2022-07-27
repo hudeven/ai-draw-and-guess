@@ -24,13 +24,13 @@
     $('#create_game').on('click', function(e) {
         var game_id = guidGenerator(length=4)
         var user_name = $('#user_name').text()
-        window.location = `/waiting_players/${game_id}/${user_name}`
+        window.location = `/create_game/${game_id}/${user_name}`
     })
 
     $('#join_game').on('click', function(e) {
         var game_id = $('#game_id').val()
         var user_name = $('#user_name').text()
-        window.location = `/waiting_players/${game_id}/${user_name}`
+        window.location = `/join_game/${game_id}/${user_name}`
     })
 
 </script>

@@ -15,6 +15,7 @@ socketio = SocketIO(app)
 
 game_players_map = defaultdict(list)  # {game_id: list of players' user_name}
 game_sentences_map = defaultdict(list)  # {game_id: list of players' sentences}
+game_creator_map = dict()
 
 
 @app.route('/')
@@ -29,10 +30,20 @@ def welcome(user_name):
     return render_template('welcome.html', user_name=user_name)
 
 
-@app.route('/waiting_players/<game_id>/<user_name>', methods=['GET'])
-def waiting_players(game_id, user_name):
-    logger.info(f"game: {game_id}, {user_name} is waiting for other players!")
-    return render_template('waiting_players.html', game_id=game_id, user_name=user_name)
+@app.route('/create_game/<game_id>/<user_name>', methods=['GET'])
+def create_game(game_id, user_name):
+    logger.info(f"User {user_name} created game {game_id}")
+    game_creator_map[game_id] = user_name
+    return render_template('waiting_players.html', game_id=game_id, user_name=user_name, creator=user_name)
+
+
+@app.route('/join_game/<game_id>/<user_name>', methods=['GET'])
+def join_game(game_id, user_name):
+    if not game_creator_map.get(game_id, None):
+        logger.error(f"Invalid game_id: {game_id}")
+        return
+    creator = game_creator_map[game_id]
+    return render_template('waiting_players.html', game_id=game_id, user_name=user_name, creator=creator)
 
 
 @app.route('/game_loop/<game_id>/<user_name>', methods=['GET', 'POST'])
@@ -55,9 +66,19 @@ def message_received(methods=['GET', 'POST']):
     logger.info('message was received!!!')
 
 
+#######################################################################
+#                  SocketIO event handlers                            #
+#######################################################################
+
+@socketio.on('start-game-event')
+def handle_join_game_event(json, methods=['GET', 'POST']):
+    logger.info('received start-game-event: ' + str(json))
+    socketio.emit("start-game-event-response", json, callback=message_received)
+
+
 @socketio.on('join-game-event')
 def handle_join_game_event(json, methods=['GET', 'POST']):
-    logger.info('received join event: ' + str(json))
+    logger.info('received join-game-event: ' + str(json))
     game_id = json["game_id"]
     user_name = json["user_name"]
     if not game_id:
@@ -120,3 +141,4 @@ def get_encoded_img(image_path):
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, host='0.0.0.0', port=5001)
+
