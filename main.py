@@ -7,6 +7,7 @@ from collections import defaultdict
 from difflib import SequenceMatcher
 from flask import Flask, render_template
 from flask_socketio import SocketIO
+import random
 
 app = Flask(__name__)
 logger = app.logger
@@ -14,6 +15,8 @@ logger.setLevel(logging.DEBUG)
 socketio = SocketIO(app)
 
 game_players_map = defaultdict(list)  # {game_id: list of players' user_name}
+game_drawers_shuffled_map = defaultdict(list) # {game_id: list of shuffled players' user_name}
+is_first_round_map = defaultdict(bool) # {game_id: bool indicating if this is first round}
 game_sentences_map = defaultdict(list)  # {game_id: list of players' sentences}
 game_creator_map = dict()
 
@@ -51,15 +54,20 @@ def game_loop(game_id, user_name):
     logger.info(f"game: {game_id}, user {user_name} enters game_loop")
     players = game_players_map[game_id]
 
-    # TODO: random select a drawer_id once, then use socket.io to broadcast the decision to guessers
-    # TODO: make the drawer selection and guesser order fair
-    # drawer_id = randint(0, len(players) - 1)
-    drawer_id = 0
-    if len(players) > 0:
-        drawer_name = players[drawer_id]
+    if is_first_round_map[game_id]:
+        random.seed(0)
+        game_drawers_shuffled_map[game_id] = random.sample(players, len(players))
+        is_first_round_map[game_id]  = False
+    # TODO: need to know the round_id
+    round_id = 0
+    if round_id < len(game_drawers_shuffled_map[game_id]):
+        drawer_name = game_drawers_shuffled_map[game_id][round_id]
+        logger.info(f"drawer: {drawer_name} is selected for this round!")
+        return render_template('game_loop.html', game_id=game_id, user_name=user_name, drawer_name=drawer_name)
     else:
         logger.error("can't find a drawer, players are empty!")
-    return render_template('game_loop.html', game_id=game_id, user_name=user_name, drawer_name=drawer_name)
+        # TODO: need a better page for game over
+        return render_template('welcome.html', user_name=user_name)
 
 
 def message_received(methods=['GET', 'POST']):
@@ -73,6 +81,8 @@ def message_received(methods=['GET', 'POST']):
 @socketio.on('start-game-event')
 def handle_join_game_event(json, methods=['GET', 'POST']):
     logger.info('received start-game-event: ' + str(json))
+    game_id = json["game_id"]
+    is_first_round_map[game_id] = True
     socketio.emit("start-game-event-response", json, callback=message_received)
 
 
@@ -141,4 +151,3 @@ def get_encoded_img(image_path):
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, host='0.0.0.0', port=5001)
-
