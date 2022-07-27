@@ -1,0 +1,9 @@
+{
+  "image_vocab_size": 16415,
+  "encoder_vocab_size": 50272,
+  "num_layers": 24,
+  "attention_heads": 32,
+  "embed_size": 2048,
+  "glu_dim": 4096,
+  "max_text_length": 64
+}
