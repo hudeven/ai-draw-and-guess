@@ -17,7 +17,8 @@
     Drawer: <span id="drawer_name">{{ drawer_name }}</span>
 </h1>
 
-<div id="display">Waiting for drawer {{ drawer_name }} to enter a sentence...</div>
+<div id="image_display"></div>
+<div id="log_display">Waiting for drawer {{ drawer_name }} to enter a sentence...</div>
 
 <form action="" method="POST">
     <input type="text" class="sentence" placeholder="Enter a sentence"/>
@@ -57,41 +58,57 @@
     socket.on('drawer-submit-event-response', function(msg) {
       console.log(msg)
       if (typeof msg !== 'undefined') {
-          $('#display').empty()
-          $('#display').append('<div><b style="color: #000">' + msg.user_name + '</b> ' + msg.sentence + '</div>')
+          $('#log_display').append('<div><b style="color: #000">' + msg.user_name + '</b> ' + msg.sentence + '</div>')
       }
     })
 
     socket.on('ai-returns-image-event', function(data) {
-      $('#display').append("<div><img width='600' height='400' src='data:image/png;base64, " + data + "'/></div>")
+        $('#image_display').html("<div><img width='600' height='400' src='data:image/png;base64, " + data + "'/></div>")
     })
 
     socket.on('round-end-event', function(data) {
-      var round_id = data.round_id
-      $('#display').append(`<div>Round ${round_id} ended!</div>`)
+        var round_id = data.round_id
+        $('#log_display').append(`<div>Round ${round_id} ended!</div>`)
     })
 
     socket.on('guesser-submit-event-response', function(msg) {
-      console.log(msg)
-      console.log(msg.leaderboard)
-      if (typeof msg !== 'undefined') {
-          $('#display').append(
+        console.log(msg)
+        $('#log_display').append(
             `<div>Guesser: <b>${msg.user_name}</b> score: ${msg.score} Sentence: ${msg.sentence}</div>`
-           )
+        )
 
-          $('#leaderboard').empty()
-          $('#leaderboard').append(`<div>Player &emsp;&emsp;&emsp; Score</div>`)
-          for (let i = 0; i < msg.leaderboard.length; i++) {
-                $('#leaderboard').append(`<div>${msg.leaderboard[i][0]} &emsp;&emsp;&emsp;&emsp;&emsp; ${msg.leaderboard[i][1]}</div>`)
-          }
-      }
+        if (msg.is_round_end) {
+            if (msg.is_drawer_win) {
+                $('#log_display').append(
+                    `<div>As no one guessed the sentence, drawer <b>${msg.user_name}</b> gets score: ${msg.score} Sentence: ${msg.sentence}</div>`
+                )
+            } else {
+                $('#log_display').append(
+                    `<div>As the correct sentence is guesses, drawer <b>${msg.user_name}</b> gets score: ${msg.score} Sentence: ${msg.sentence}</div>`
+                )
+            }
+
+            $('#log_display').append(`<div>Leaderboard for ${msg.round_id}</div>`)
+            for (let i = 0; i < msg.round_leaderboard.length; i++) {
+                $('#log_display').append(
+                    `<div>${msg.round_leaderboard[i][0]} &emsp;&emsp;&emsp;&emsp;&emsp; ${msg.round_leaderboard[i][1]}</div>`
+                )
+            }
+        }
+
+        $('#game_leaderboard').empty()
+        $('#game_leaderboard').append(`<div>Player &emsp;&emsp;&emsp; Score</div>`)
+        for (let i = 0; i < msg.game_leaderboard.length; i++) {
+            $('#game_leaderboard').append(
+                `<div>${msg.game_leaderboard[i][0]} &emsp;&emsp;&emsp;&emsp;&emsp; ${msg.game_leaderboard[i][1]}</div>`
+            )
+        }
     })
 
     // Refresh page to the next round
     socket.on('start-new-round-event', function(msg) {
-        $('#display').empty()
-        $('#display').append(`<div>Started round ${msg.round_id}</div>`)
-        $('#display').append(`<div>Waiting for drawer ${msg.drawer_name} to enter a sentence</div>`)
+        $('#log_display').append(`<br><br><div>Started round ${msg.round_id}</div>`)
+        $('#log_display').append(`<div>Waiting for drawer ${msg.drawer_name} to enter a sentence</div>`)
         $('#round_id').text(msg.round_id)
         $('#drawer_name').text(msg.drawer_name)
     })

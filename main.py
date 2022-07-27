@@ -21,6 +21,7 @@ game_sentences_map = defaultdict(list)  # {game_id: list of players' sentences}
 game_creator_map = dict()
 game_guesser_sentence_map = defaultdict(dict)  # {game_id: {guesser_name: sentence}}
 game_leaderboard = defaultdict(dict)
+round_leaderboard = defaultdict(dict)
 
 #######################################################################
 #                         service endpoint                            #
@@ -139,13 +140,26 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
     ######################################################################
 
     game_leaderboard[game_id][user_name] += score
-    leaderboard = sorted(game_leaderboard[game_id].items(), key=lambda x: x[1], reverse=True)
+
+    round_end = is_round_end(game_id)
+    if round_end:
+        # at the end of round, add score for the drawer
+        drawer_name = get_drawer(game_id, round_id_map[game_id])
+        game_leaderboard[game_id][drawer_name] = get_drawer_score(game_id)
+        json["drawer_name"] = drawer_name
+        json["is_round_end"] = True
+        json["round_id"] = round_id_map[game_id]
+
+    game_leaderboard_sorted = sorted(game_leaderboard[game_id].items(), key=lambda x: x[1], reverse=True)
+    round_leaderboard_sorted = sorted(round_leaderboard[game_id].items(), key=lambda x: x[1], reverse=True)
 
     json["score"] = score
-    json["leaderboard"] = leaderboard
+    json["game_leaderboard"] = game_leaderboard_sorted
+    json["round_leaderboard"] = round_leaderboard_sorted
+    json["is_drawer_win"] = game_leaderboard[game_id][drawer_name] == 10
     socketio.emit('guesser-submit-event-response', json, callback=message_received)
 
-    if is_round_end(game_id):
+    if round_end:
         # clean up context for previous round
         game_guesser_sentence_map[game_id] = {}
 
@@ -161,14 +175,26 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
 #######################################################################
 
 
+def get_drawer_score(game_id):
+    """
+    If no guessers get 10, the drawer will get 10. Otherwise, drawer gets 0
+    It incentivizes the drawer to enter a harder sentence to fight against the guessers
+    """
+    for user_name, score in round_leaderboard[game_id].items():
+        if score >= 10:
+            return 0
+    return 10
+
+
 def reset_leaderboard(game_id):
     players = game_players_map[game_id]
-    leaderboard = game_leaderboard[game_id]
     for player in players:
-        leaderboard[player] = 0
+        game_leaderboard[game_id][player] = 0
+        round_leaderboard[game_id][player] = 0
 
 
 def update_leaderboard(game_id, user_name, score):
+    round_leaderboard[game_id][user_name] = score
     game_leaderboard[game_id][user_name] += score
 
 
@@ -179,10 +205,14 @@ def select_drawer(game_id, round_id):
         players = game_players_map[game_id]
         game_drawers_shuffled_map[game_id] = random.sample(players, len(players))
 
-    drawer_id = round_id % len(game_drawers_shuffled_map[game_id])
-    drawer_name = game_drawers_shuffled_map[game_id][drawer_id]
+    drawer_name = get_drawer(game_id, round_id)
     logger.info(f"drawer: {drawer_name} is selected for this round!")
     return drawer_name
+
+
+def get_drawer(game_id, round_id):
+    drawer_id = round_id % len(game_drawers_shuffled_map[game_id])
+    return game_drawers_shuffled_map[game_id][drawer_id]
 
 
 def message_received(methods=['GET', 'POST']):
