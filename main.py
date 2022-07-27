@@ -15,10 +15,16 @@ logger.setLevel(logging.DEBUG)
 socketio = SocketIO(app)
 
 game_players_map = defaultdict(list)  # {game_id: list of players' user_name}
-game_drawers_shuffled_map = defaultdict(list) # {game_id: list of shuffled players' user_name}
-round_id_map = defaultdict(int) # {game_id: number indicating the game round}
+game_drawers_shuffled_map = defaultdict(list)  # {game_id: list of shuffled players' user_name}
+round_id_map = defaultdict(int)  # {game_id: number indicating the game round}
 game_sentences_map = defaultdict(list)  # {game_id: list of players' sentences}
 game_creator_map = dict()
+game_guesser_sentence_map = defaultdict(dict)  # {game_id: {guesser_name: sentence}}
+
+
+#######################################################################
+#                         service endpoint                            #
+#######################################################################
 
 
 @app.route('/')
@@ -52,36 +58,30 @@ def join_game(game_id, user_name):
 @app.route('/game_loop/<game_id>/<user_name>', methods=['GET', 'POST'])
 def game_loop(game_id, user_name):
     logger.info(f"game: {game_id}, user {user_name} enters game_loop")
-    players = game_players_map[game_id]
 
-    # TODO: need to know the round_id
-    round_id = round_id_map[game_id]
-    if round_id == 0:
-        random.seed(0)
-        game_drawers_shuffled_map[game_id] = random.sample(players, len(players))
-    if round_id < len(game_drawers_shuffled_map[game_id]):
-        drawer_name = game_drawers_shuffled_map[game_id][round_id]
-        logger.info(f"drawer: {drawer_name} is selected for this round!")
-        return render_template('game_loop.html', game_id=game_id, user_name=user_name, drawer_name=drawer_name)
-    else:
-        logger.error("can't find a drawer, players are empty!")
-        # TODO: need a better page for game over
-        return render_template('welcome.html', user_name=user_name)
-
-
-def message_received(methods=['GET', 'POST']):
-    logger.info('message was received!!!')
+    round_id = 0
+    drawer_name = select_drawer(game_id, round_id)
+    logger.info(f"drawer: {drawer_name} is selected for this round!")
+    return render_template(
+        'game_loop.html',
+        game_id=game_id,
+        user_name=user_name,
+        drawer_name=drawer_name,
+        round_id=round_id,
+    )
 
 
 #######################################################################
-#                  SocketIO event handlers                            #
+#                  Socket.IO event handlers                            #
 #######################################################################
+
 
 @socketio.on('start-game-event')
-def handle_join_game_event(json, methods=['GET', 'POST']):
+def handle_start_game_event(json, methods=['GET', 'POST']):
     logger.info('received start-game-event: ' + str(json))
     game_id = json["game_id"]
     round_id_map[game_id] = 0
+    json["round_id"] = 0
     socketio.emit("start-game-event-response", json, callback=message_received)
 
 
@@ -127,17 +127,56 @@ def handle_drawer_submit_event(json, methods=['GET', 'POST']):
 @socketio.on('guesser-submit-event')
 def handle_guesser_submit_event(json, methods=['GET', 'POST']):
     logger.info('received guesser-submit-event: ' + str(json))
-    correct_sentence = game_sentences_map[json["game_id"]][0]
+    game_id = json["game_id"]
+    user_name = json["user_name"]
     guess_sentence = json["sentence"]
+    game_guesser_sentence_map[game_id][user_name] = guess_sentence
+    correct_sentence = game_sentences_map[game_id][0]
 
     # TODO: call text-similarity model to calculate the score
-
     similarity_score = SequenceMatcher(None, correct_sentence, guess_sentence).ratio() * 10
-
     ######################################################################
 
     json["score"] = similarity_score
     socketio.emit('guesser-submit-event-response', json, callback=message_received)
+
+    if is_round_end(game_id):
+        # clean up context for previous round
+        game_guesser_sentence_map[game_id] = {}
+
+        # setup context for the new round
+        round_id_map[game_id] += 1
+        drawer_name = select_drawer(game_id, round_id=round_id_map[game_id])
+        payload = {"game_id": game_id, "round_id": round_id_map[game_id], "drawer_name": drawer_name}
+        socketio.emit("start-new-round-event", payload, callback=message_received)
+
+
+#######################################################################
+#                         helper functions                            #
+#######################################################################
+
+
+def select_drawer(game_id, round_id):
+    round_id = int(round_id)
+    if round_id == 0:
+        random.seed(0)
+        players = game_players_map[game_id]
+        game_drawers_shuffled_map[game_id] = random.sample(players, len(players))
+
+    drawer_id = round_id % len(game_drawers_shuffled_map[game_id])
+    drawer_name = game_drawers_shuffled_map[game_id][drawer_id]
+    logger.info(f"drawer: {drawer_name} is selected for this round!")
+    return drawer_name
+
+
+def message_received(methods=['GET', 'POST']):
+    logger.info('message was received!!!')
+
+
+def is_round_end(game_id):
+    num_guesser_sentences = len(game_guesser_sentence_map[game_id])
+    num_guesser = len(game_players_map[game_id]) - 1
+    return num_guesser_sentences == num_guesser
 
 
 def get_encoded_img(image_path):

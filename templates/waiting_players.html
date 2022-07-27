@@ -49,6 +49,7 @@
 
     // Navigate every player to game_loop page
     socket.on('start-game-event-response', function(msg) {
+        var round_id = msg.round_id
         window.location = `/game_loop/${game_id}/${user_name}`
     })
 

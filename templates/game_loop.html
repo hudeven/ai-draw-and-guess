@@ -12,30 +12,28 @@
     <br>
     GameId: <span id="game_id">{{ game_id }}</span>
     <br>
+    Round: <span id="round_id">{{ round_id }}</span>
+    <br>
     Drawer: <span id="drawer_name">{{ drawer_name }}</span>
 </h1>
 
 <div id="display">Waiting for drawer {{ drawer_name }} to enter a sentence...</div>
 
 <form action="" method="POST">
-    {% if drawer_name == user_name %}
-    <input type="text" class="sentence" placeholder="Enter a sentence for AI to draw an image"/>
-    {% else %}
-    <input type="text" class="sentence" placeholder="Enter a guessing sentence"/>
-    {% endif %}
+    <input type="text" class="sentence" placeholder="Enter a sentence"/>
     <input type="submit"/>
 </form>
 
 <script type="text/javascript">
-  var game_id = $('#game_id').text()
-  var user_name = $('#user_name').text()
-  var drawer_name = $('#drawer_name').text()
+    var game_id = $('#game_id').text()
+    var user_name = $('#user_name').text()
 
-  var socket = io.connect('http://' + document.domain + ':' + location.port);
+    var socket = io.connect('http://' + document.domain + ':' + location.port);
 
-  $('form').on('submit', function(e) {
+    $('form').on('submit', function(e) {
       e.preventDefault()
       var sentence = $('input.sentence').val()
+      var drawer_name = $('#drawer_name').text()
       if (drawer_name == user_name) {
           socket.emit('drawer-submit-event', {
               game_id: game_id,
@@ -51,28 +49,42 @@
       }
 
       $('input.sentence').val('').focus()
-  })
+    })
 
-  socket.on('drawer-submit-event-response', function(msg) {
+    socket.on('drawer-submit-event-response', function(msg) {
       console.log(msg)
       if (typeof msg !== 'undefined') {
           $('#display').empty()
           $('#display').append('<div><b style="color: #000">' + msg.user_name + '</b> ' + msg.sentence + '</div>')
       }
-  })
+    })
 
-  socket.on('ai-returns-image-event', function(data) {
+    socket.on('ai-returns-image-event', function(data) {
       $('#display').append("<div><img width='600' height='400' src='data:image/png;base64, " + data + "'/></div>")
-  })
+    })
 
-  socket.on('guesser-submit-event-response', function(msg) {
+    socket.on('round-end-event', function(data) {
+      var round_id = data.round_id
+      $('#display').append(`<div>Round ${round_id} ended!</div>`)
+    })
+
+    socket.on('guesser-submit-event-response', function(msg) {
       console.log(msg)
       if (typeof msg !== 'undefined') {
           $('#display').append(
             `<div>Guesser: <b>${msg.user_name}</b> score: ${msg.score} Sentence: ${msg.sentence}</div>`
            )
       }
-  })
+    })
+
+    // Refresh page to the next round
+    socket.on('start-new-round-event', function(msg) {
+        $('#display').empty()
+        $('#display').append(`<div>Started round ${msg.round_id}</div>`)
+        $('#display').append(`<div>Waiting for drawer ${msg.drawer_name} to enter a sentence</div>`)
+        $('#round_id').text(msg.round_id)
+        $('#drawer_name').text(msg.drawer_name)
+    })
 
 </script>
 
