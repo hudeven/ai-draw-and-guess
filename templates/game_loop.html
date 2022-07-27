@@ -24,6 +24,9 @@
     <input type="submit"/>
 </form>
 
+<h2>Leaderboard</h2>
+<div id="leaderboard"></div>
+
 <script type="text/javascript">
     var game_id = $('#game_id').text()
     var user_name = $('#user_name').text()
@@ -70,10 +73,17 @@
 
     socket.on('guesser-submit-event-response', function(msg) {
       console.log(msg)
+      console.log(msg.leaderboard)
       if (typeof msg !== 'undefined') {
           $('#display').append(
             `<div>Guesser: <b>${msg.user_name}</b> score: ${msg.score} Sentence: ${msg.sentence}</div>`
            )
+
+          $('#leaderboard').empty()
+          $('#leaderboard').append(`<div>Player &emsp;&emsp;&emsp; Score</div>`)
+          for (let i = 0; i < msg.leaderboard.length; i++) {
+                $('#leaderboard').append(`<div>${msg.leaderboard[i][0]} &emsp;&emsp;&emsp;&emsp;&emsp; ${msg.leaderboard[i][1]}</div>`)
+          }
       }
     })
 

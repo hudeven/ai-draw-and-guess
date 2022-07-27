@@ -20,7 +20,7 @@ round_id_map = defaultdict(int)  # {game_id: number indicating the game round}
 game_sentences_map = defaultdict(list)  # {game_id: list of players' sentences}
 game_creator_map = dict()
 game_guesser_sentence_map = defaultdict(dict)  # {game_id: {guesser_name: sentence}}
-
+game_leaderboard = defaultdict(dict)
 
 #######################################################################
 #                         service endpoint                            #
@@ -81,6 +81,7 @@ def handle_start_game_event(json, methods=['GET', 'POST']):
     logger.info('received start-game-event: ' + str(json))
     game_id = json["game_id"]
     round_id_map[game_id] = 0
+    reset_leaderboard(game_id)
     json["round_id"] = 0
     socketio.emit("start-game-event-response", json, callback=message_received)
 
@@ -134,10 +135,14 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
     correct_sentence = game_sentences_map[game_id][0]
 
     # TODO: call text-similarity model to calculate the score
-    similarity_score = SequenceMatcher(None, correct_sentence, guess_sentence).ratio() * 10
+    score = SequenceMatcher(None, correct_sentence, guess_sentence).ratio() * 10
     ######################################################################
 
-    json["score"] = similarity_score
+    game_leaderboard[game_id][user_name] += score
+    leaderboard = sorted(game_leaderboard[game_id].items(), key=lambda x: x[1], reverse=True)
+
+    json["score"] = score
+    json["leaderboard"] = leaderboard
     socketio.emit('guesser-submit-event-response', json, callback=message_received)
 
     if is_round_end(game_id):
@@ -154,6 +159,17 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
 #######################################################################
 #                         helper functions                            #
 #######################################################################
+
+
+def reset_leaderboard(game_id):
+    players = game_players_map[game_id]
+    leaderboard = game_leaderboard[game_id]
+    for player in players:
+        leaderboard[player] = 0
+
+
+def update_leaderboard(game_id, user_name, score):
+    game_leaderboard[game_id][user_name] += score
 
 
 def select_drawer(game_id, round_id):
