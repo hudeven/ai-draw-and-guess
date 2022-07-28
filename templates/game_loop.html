@@ -26,7 +26,7 @@
 </form>
 
 <h2>Leaderboard</h2>
-<div id="leaderboard"></div>
+<div id="game_leaderboard"></div>
 
 <script type="text/javascript">
     var game_id = $('#game_id').text()
@@ -80,15 +80,15 @@
         if (msg.is_round_end) {
             if (msg.is_drawer_win) {
                 $('#log_display').append(
-                    `<div>As no one guessed the sentence, drawer <b>${msg.user_name}</b> gets score: ${msg.score} Sentence: ${msg.sentence}</div>`
+                    `<div>Drawer <b>${msg.drawer_name}</b> gets score: ${msg.drawer_score} because no one guessed the sentence: ${msg.sentence}</div>`
                 )
             } else {
                 $('#log_display').append(
-                    `<div>As the correct sentence is guesses, drawer <b>${msg.user_name}</b> gets score: ${msg.score} Sentence: ${msg.sentence}</div>`
+                    `<div>Drawer <b>${msg.drawer_name}</b> gets score: ${msg.drawer_score} because the sentence is guessed: ${msg.sentence}</div>`
                 )
             }
 
-            $('#log_display').append(`<div>Leaderboard for ${msg.round_id}</div>`)
+            $('#log_display').append(`<div>Leaderboard for round ${msg.round_id}</div>`)
             for (let i = 0; i < msg.round_leaderboard.length; i++) {
                 $('#log_display').append(
                     `<div>${msg.round_leaderboard[i][0]} &emsp;&emsp;&emsp;&emsp;&emsp; ${msg.round_leaderboard[i][1]}</div>`

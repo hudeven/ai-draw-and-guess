@@ -82,7 +82,7 @@ def handle_start_game_event(json, methods=['GET', 'POST']):
     logger.info('received start-game-event: ' + str(json))
     game_id = json["game_id"]
     round_id_map[game_id] = 0
-    reset_leaderboard(game_id)
+    reset_leaderboards(game_id)
     json["round_id"] = 0
     socketio.emit("start-game-event-response", json, callback=message_received)
 
@@ -139,16 +139,19 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
     score = SequenceMatcher(None, correct_sentence, guess_sentence).ratio() * 10
     ######################################################################
 
-    game_leaderboard[game_id][user_name] += score
+    update_leaderboards(game_id, user_name, score)
 
     round_end = is_round_end(game_id)
+    json["is_round_end"] = round_end
     if round_end:
         # at the end of round, add score for the drawer
         drawer_name = get_drawer(game_id, round_id_map[game_id])
-        game_leaderboard[game_id][drawer_name] = get_drawer_score(game_id)
-        json["drawer_name"] = drawer_name
-        json["is_round_end"] = True
+        drawer_score = get_drawer_score(game_id)
+        update_leaderboards(game_id, drawer_name, drawer_score)
         json["round_id"] = round_id_map[game_id]
+        json["drawer_name"] = drawer_name
+        json["drawer_score"] = drawer_score
+        json["is_drawer_win"] = game_leaderboard[game_id][drawer_name] == 10
 
     game_leaderboard_sorted = sorted(game_leaderboard[game_id].items(), key=lambda x: x[1], reverse=True)
     round_leaderboard_sorted = sorted(round_leaderboard[game_id].items(), key=lambda x: x[1], reverse=True)
@@ -156,7 +159,7 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
     json["score"] = score
     json["game_leaderboard"] = game_leaderboard_sorted
     json["round_leaderboard"] = round_leaderboard_sorted
-    json["is_drawer_win"] = game_leaderboard[game_id][drawer_name] == 10
+
     socketio.emit('guesser-submit-event-response', json, callback=message_received)
 
     if round_end:
@@ -186,14 +189,14 @@ def get_drawer_score(game_id):
     return 10
 
 
-def reset_leaderboard(game_id):
+def reset_leaderboards(game_id):
     players = game_players_map[game_id]
     for player in players:
         game_leaderboard[game_id][player] = 0
         round_leaderboard[game_id][player] = 0
 
 
-def update_leaderboard(game_id, user_name, score):
+def update_leaderboards(game_id, user_name, score):
     round_leaderboard[game_id][user_name] = score
     game_leaderboard[game_id][user_name] += score
 
