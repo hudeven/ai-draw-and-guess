@@ -59,14 +59,43 @@ class AttentionBase(nn.Module):
         return attention_output
 
 
-class EncoderSelfAttention(AttentionBase):
+class EncoderSelfAttention(nn.Module):
+    def __init__(self, attention_heads: int, embed_size: int):
+        super().__init__()
+        self.attention_heads = attention_heads
+        self.embed_size = embed_size
+
+        self.k_proj = nn.Linear(embed_size, embed_size, bias=False)
+        self.v_proj = nn.Linear(embed_size, embed_size, bias=False)
+        self.q_proj = nn.Linear(embed_size, embed_size, bias=False)
+        self.out_proj = nn.Linear(embed_size, embed_size, bias=False)
+
+
     def forward(
         self, encoder_state: FloatTensor, attention_mask: BoolTensor
     ) -> FloatTensor:
         keys = self.k_proj.forward(encoder_state)
         values = self.v_proj.forward(encoder_state)
         queries = self.q_proj.forward(encoder_state)
-        return super().forward(keys, values, queries, attention_mask)
+
+        # return super().forward(keys, values, queries, attention_mask)
+        # We need to duplicate the code from AttentionBase for TorchScript
+        keys = keys.reshape(keys.shape[:2] + (self.attention_heads, -1))
+        values = values.reshape(values.shape[:2] + (self.attention_heads, -1))
+        queries = queries.reshape(queries.shape[:2] + (self.attention_heads, -1))
+        queries /= queries.shape[-1] ** 0.5
+
+        attention_bias = (1 - attention_mask.to(torch.float32)) * -1e12
+        attention_weights: FloatTensor = torch.einsum("bqhc,bkhc->bhqk", queries, keys)
+        attention_weights += attention_bias[:, None, None, :]
+        attention_weights = torch.softmax(attention_weights, -1)
+        attention_output: FloatTensor = torch.einsum(
+            "bhqk,bkhc->bqhc", attention_weights, values
+        )
+        shape = attention_output.shape[:2] + (self.embed_size,)
+        attention_output = attention_output.reshape(shape)
+        attention_output = self.out_proj.forward(attention_output)
+        return attention_output
 
 
 class EncoderLayer(nn.Module):

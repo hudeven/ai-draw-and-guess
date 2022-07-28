@@ -6,7 +6,18 @@ from .bart_encoder import GLU, AttentionBase
 IMAGE_TOKEN_LENGTH = 256
 
 
-class DecoderCrossAttention(AttentionBase):
+class DecoderCrossAttention(nn.Module):
+    def __init__(self, attention_heads: int, embed_size: int):
+        super().__init__()
+        self.attention_heads = attention_heads
+        self.embed_size = embed_size
+
+        self.k_proj = nn.Linear(embed_size, embed_size, bias=False)
+        self.v_proj = nn.Linear(embed_size, embed_size, bias=False)
+        self.q_proj = nn.Linear(embed_size, embed_size, bias=False)
+        self.out_proj = nn.Linear(embed_size, embed_size, bias=False)
+
+
     def forward(
         self,
         decoder_state: FloatTensor,
@@ -16,12 +27,36 @@ class DecoderCrossAttention(AttentionBase):
         keys = self.k_proj.forward(encoder_state)
         values = self.v_proj.forward(encoder_state)
         queries = self.q_proj.forward(decoder_state)
-        return super().forward(keys, values, queries, attention_mask)
+        # return super().forward(keys, values, queries, attention_mask)
+
+        keys = keys.reshape(keys.shape[:2] + (self.attention_heads, -1))
+        values = values.reshape(values.shape[:2] + (self.attention_heads, -1))
+        queries = queries.reshape(queries.shape[:2] + (self.attention_heads, -1))
+        queries /= queries.shape[-1] ** 0.5
+
+        attention_bias = (1 - attention_mask.to(torch.float32)) * -1e12
+        attention_weights: FloatTensor = torch.einsum("bqhc,bkhc->bhqk", queries, keys)
+        attention_weights += attention_bias[:, None, None, :]
+        attention_weights = torch.softmax(attention_weights, -1)
+        attention_output: FloatTensor = torch.einsum(
+            "bhqk,bkhc->bqhc", attention_weights, values
+        )
+        shape = attention_output.shape[:2] + (self.embed_size,)
+        attention_output = attention_output.reshape(shape)
+        attention_output = self.out_proj.forward(attention_output)
+        return attention_output
 
 
-class DecoderSelfAttention(AttentionBase):
+class DecoderSelfAttention(nn.Module):
     def __init__(self, head_dim: int, embed_size: int):
-        super().__init__(head_dim, embed_size)
+        super().__init__()
+        self.attention_heads = head_dim
+        self.embed_size = embed_size
+
+        self.k_proj = nn.Linear(embed_size, embed_size, bias=False)
+        self.v_proj = nn.Linear(embed_size, embed_size, bias=False)
+        self.q_proj = nn.Linear(embed_size, embed_size, bias=False)
+        self.out_proj = nn.Linear(embed_size, embed_size, bias=False)
 
     def forward(
         self,
@@ -38,7 +73,24 @@ class DecoderSelfAttention(AttentionBase):
         batch_size = decoder_state.shape[0]
         keys = attention_state[:batch_size]
         values = attention_state[batch_size:]
-        decoder_state = super().forward(keys, values, queries, attn_mask)
+
+        # decoder_state = super().forward(keys, values, queries, attn_mask)
+        # We need to duplicate the code from AttentionBase for TorchScript to work
+        keys = keys.reshape(keys.shape[:2] + (self.attention_heads, -1))
+        values = values.reshape(values.shape[:2] + (self.attention_heads, -1))
+        queries = queries.reshape(queries.shape[:2] + (self.attention_heads, -1))
+        queries /= queries.shape[-1] ** 0.5
+
+        attention_bias = (1 - attn_mask.to(torch.float32)) * -1e12
+        attention_weights: FloatTensor = torch.einsum("bqhc,bkhc->bhqk", queries, keys)
+        attention_weights += attention_bias[:, None, None, :]
+        attention_weights = torch.softmax(attention_weights, -1)
+        attention_output: FloatTensor = torch.einsum(
+            "bhqk,bkhc->bqhc", attention_weights, values
+        )
+        shape = attention_output.shape[:2] + (self.embed_size,)
+        attention_output = attention_output.reshape(shape)
+        decoder_state = self.out_proj.forward(attention_output)        
         return decoder_state, attention_state
 
 
@@ -146,8 +198,8 @@ class DalleBartDecoder(nn.Module):
         decoder_state += self.embed_positions.forward(token_index_batched)
         decoder_state = self.layernorm_embedding.forward(decoder_state)
         decoder_state = decoder_state[:, None]
-        for i in range(self.num_layers):
-            decoder_state, attention_state[i] = self.layers[i].forward(
+        for i, layer in enumerate(self.layers):
+            decoder_state, attention_state[i] = layer.forward(
                 decoder_state,
                 encoder_state,
                 attention_state[i],
@@ -159,7 +211,7 @@ class DalleBartDecoder(nn.Module):
         temperature = settings[[0]]
         top_k = settings[[1]].to(torch.long)
         supercondition_factor = settings[[2]]
-        logits = logits[:, -1, : 2**14]
+        logits = logits[:, -1, : 16384]
         logits: FloatTensor = (
             logits[:image_size] * (1 - supercondition_factor)
             + logits[image_size:] * supercondition_factor
