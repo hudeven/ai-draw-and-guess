@@ -25,11 +25,9 @@ class MinDalle:
         self,
         root_dir: str = "../pretrained",
         dtype: torch.dtype = torch.float32,
-        device: str = None,
         is_mega: bool = True,
     ):
-        if device == None:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
         self.dtype = dtype
 
@@ -88,11 +86,10 @@ class MinDalle:
         self.detokenizer = self.detokenizer.to(device=self.device)
         del params
 
-    def generate_raw_image_stream(
+    def generate_image(
         self,
         text: str,
         grid_size: int,
-        progressive_outputs: bool = False,
         is_seamless: bool = False,
         temperature: float = 1,
         top_k: int = 256,
@@ -150,34 +147,5 @@ class MinDalle:
                     token_index=token_indices[[i]],
                 )
 
-            with torch.cuda.amp.autocast(dtype=torch.float32):
-                if ((i + 1) % 32 == 0 and progressive_outputs) or i + 1 == 256:
-                    torch.cuda.empty_cache()
-                    yield self.detokenizer.forward(is_seamless, image_tokens[1:].T)
-
-    def generate_image_stream(self, *args, **kwargs) -> Iterator[Image.Image]:
-        image_stream = self.generate_raw_image_stream(*args, **kwargs)
-        for image in image_stream:
-            image = image.to(torch.uint8).to("cpu").numpy()
-            yield Image.fromarray(image)
-
-    def generate_images_stream(self, *args, **kwargs) -> Iterator[FloatTensor]:
-        image_stream = self.generate_raw_image_stream(*args, **kwargs)
-        for image in image_stream:
-            grid_size = kwargs["grid_size"]
-            image = image.view([grid_size * 256, grid_size, 256, 3])
-            image = image.transpose(1, 0)
-            image = image.reshape([grid_size**2, 2**8, 2**8, 3])
-            yield image
-
-    def generate_image(self, *args, **kwargs) -> Image.Image:
-        image_stream = self.generate_image_stream(
-            *args, **kwargs, progressive_outputs=False
-        )
-        return next(image_stream)
-
-    def generate_images(self, *args, **kwargs) -> Image.Image:
-        images_stream = self.generate_images_stream(
-            *args, **kwargs, progressive_outputs=False
-        )
-        return next(images_stream)
+        image = self.detokenizer.forward(is_seamless, image_tokens[1:].T)
+        return image.to(torch.uint8).to("cpu").numpy()
