@@ -142,7 +142,7 @@ def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     if request.method == "GET":
         input_text = game_sentences_map[json["game_id"]][0] # assume first sentence is input
         # url = "http://localhost:8080/predictions/dalle_image_gen" # for dalle_image
-        # url = "http://localhost:8080/predictions/dalle_image" # for dalle_image_mini
+        url = "http://localhost:8080/predictions/dalle_image" # for dalle_image_mini
         response = requests.get(url, data={'input_text':input_text})
 
         ######################################################################
