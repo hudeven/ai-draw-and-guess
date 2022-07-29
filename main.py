@@ -1,13 +1,12 @@
 import base64
 import io
 import logging
-import flask
-import os
+import requests
 
 from PIL import Image
 from collections import defaultdict
 from difflib import SequenceMatcher
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from flask_socketio import SocketIO
 import random
 
@@ -140,30 +139,16 @@ def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     # TODO: cache (draw's sentence, output image) for faster demo
     # Mock the output image from text-to-image model
 
-    # ai_drawed_image_path = "resources/pytorch_logo.png"
+    if request.method == "GET":
+        input_text = game_sentences_map[json["game_id"]][0] # assume first sentence is input
+        # url = "http://localhost:8080/predictions/dalle_image_gen" # for dalle_image
+        url = "http://localhost:8080/predictions/dalle_image" # for dalle_image_mini
+        response = requests.get(url, data={'input_text':input_text})
 
+        ######################################################################
 
-    ######################################################################
-    torch.cuda.empty_cache()
-    
-    text = json["sentence"]
-    tokens = prepare_tokens(tokenizer, text)
-    images = model(
-        tokens,
-        grid_size=1,
-        temperature=1,
-        top_k=32,
-        supercondition_factor=16.0,
-        progressive_outputs=True,
-        is_seamless= False,
-        is_verbose= True,
-    )
-    # ai_drawed_image_path = "resources/temp.png"
-    # im.save(ai_drawed_image_path)
-    
-    for i, image in enumerate(images):
-        encoded_img= get_encoded_img(image_obj=Image.fromarray(image.numpy()))
-        socketio.emit('ai-returns-image-event', encoded_img, callback=message_received)
+        img = get_encoded_img(response.content)
+        socketio.emit('ai-returns-image-event', img, callback=message_received)
 
 
 @socketio.on('guesser-submit-event')
@@ -267,16 +252,8 @@ def is_round_end(game_id):
     num_guesser = len(game_players_map[game_id]) - 1
     return num_guesser_sentences == num_guesser
 
-
-def get_encoded_img(image_path=None, image_obj=None):
-    assert image_path or image_obj
-    if image_path:
-        img = Image.open(image_path, mode='r')
-    else:
-        img = image_obj
-    img_byte_arr = io.BytesIO()
-    img.save(img_byte_arr, format='PNG')
-    encoded_img = base64.encodebytes(img_byte_arr.getvalue()).decode('ascii')
+def get_encoded_img(img):
+    encoded_img = base64.encodebytes(img).decode('ascii')
     return encoded_img
 
 
