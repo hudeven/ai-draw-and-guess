@@ -1,4 +1,5 @@
 import os
+import numpy
 import torch
 import torch.nn as nn
 import torch.backends.cudnn, torch.backends.cuda
@@ -6,6 +7,8 @@ import json
 from .bart_encoder import DalleBartEncoder
 from .bart_decoder import DalleBartDecoder
 from .vqgan_detokenizer import VQGanDetokenizer
+from models.dalle.text_tokenizer import TextTokenizer
+
 
 torch.set_grad_enabled(False)
 torch.set_num_threads(os.cpu_count())
@@ -14,10 +17,11 @@ torch.backends.cudnn.allow_tf32 = True
 
 
 class MinDalle(nn.Module):
-    def __init__(self, root_dir="../pretrained", is_mega=True):
+    def __init__(self, root_dir="../pretrained", is_mega=True, is_reusable: bool = True):
         super().__init__()
         device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
+        self.is_reusable = is_reusable
 
         root_dir = os.path.join(root_dir, f"dalle_{'mega' if is_mega else 'mini'}")
         with open(os.path.join(root_dir, "config.json"), "r") as f:
@@ -63,6 +67,9 @@ class MinDalle(nn.Module):
         temperature: float = 1,
         top_k: int = 256,
         supercondition_factor: int = 16,
+        progressive_outputs: bool = False,
+        is_seamless: bool = False,
+        is_verbose: bool = True,
     ):
         with torch.cuda.amp.autocast(dtype=torch.float16):
             encoder_state = self.encoder.forward(text_tokens)
@@ -106,6 +113,49 @@ class MinDalle(nn.Module):
                     token_index=token_indices[[i]],
                 )
 
-        image = self.detokenizer.forward(image_tokens[1:].T)
-        image = image.to(torch.uint8).to("cpu")
-        return image
+            with torch.cuda.amp.autocast(dtype=torch.float32):
+                if ((i + 1) % 32 == 0 and progressive_outputs) or i + 1 == 256:
+                    yield self.image_grid_from_tokens(
+                        image_tokens=image_tokens[1:].T,
+                        is_seamless=is_seamless,
+                        is_verbose=is_verbose
+                    )
+        # image = self.detokenizer.forward(image_tokens[1:].T)
+        # image = image.to(torch.uint8).to("cpu")
+        # return image
+
+
+    def image_grid_from_tokens(
+        self,
+        image_tokens,
+        is_seamless: bool,
+        is_verbose: bool = False,
+    ):
+        if not self.is_reusable: del self.decoder
+        torch.cuda.empty_cache()
+        if not self.is_reusable: self.init_detokenizer()
+        if is_verbose: print("detokenizing image")
+        images = self.detokenizer.forward(image_tokens)
+        images = images.to(torch.uint8).to("cpu")
+        if not self.is_reusable: del self.detokenizer
+        return images
+
+
+def get_tokenizer(root_dir):
+    with open(os.path.join(root_dir, "vocab.json"), "r") as f:
+        vocab = json.load(f)
+    with open(os.path.join(root_dir, "merges.txt"), "r") as f:
+        merges = f.read().split("\n")[1:-1]
+    return TextTokenizer(vocab, merges)
+
+
+def prepare_tokens(tokenizer, text):
+    tokens = tokenizer.tokenize(text)
+    if len(tokens) > 64:
+        tokens = tokens[:64]
+
+    text_tokens = numpy.ones((2, 64), dtype=numpy.int32)
+    text_tokens[0, :2] = [tokens[0], tokens[-1]]
+    text_tokens[1, : len(tokens)] = tokens
+    text_tokens = torch.tensor(text_tokens, dtype=torch.long).cuda()
+    return text_tokens

@@ -2,8 +2,7 @@ import argparse
 import os
 import json
 import numpy
-from models.dalle.text_tokenizer import TextTokenizer
-from models.dalle.dalle import MinDalle
+from models.dalle.dalle import MinDalle, get_tokenizer, prepare_tokens
 import torch
 import time
 from PIL import Image
@@ -16,7 +15,7 @@ if __name__ == "__main__":
     parser.add_argument("--no-fp16", action="store_true")
     parser.add_argument("--text", type=str, default="Dali painting of WALL·E")
     parser.add_argument("--grid-size", type=int, default=3)
-    parser.add_argument("--image-path", type=str, default="images/walle.png")
+    parser.add_argument("--image-path", type=str, default="images/walle")
     parser.add_argument("--root-dir", type=str, default="pretrained")
     parser.add_argument("--top-k", type=int, default=256)
     args = parser.parse_args()
@@ -26,20 +25,9 @@ if __name__ == "__main__":
     root_dir = os.path.join(
         args.root_dir, f"dalle_{'mini' if args.no_mega else 'mega'}"
     )
-    with open(os.path.join(root_dir, "vocab.json"), "r") as f:
-        vocab = json.load(f)
-    with open(os.path.join(root_dir, "merges.txt"), "r") as f:
-        merges = f.read().split("\n")[1:-1]
-    tokenizer = TextTokenizer(vocab, merges)
 
-    tokens = tokenizer.tokenize(args.text)
-    if len(tokens) > 64:
-        tokens = tokens[:64]
-
-    text_tokens = numpy.ones((2, 64), dtype=numpy.int32)
-    text_tokens[0, :2] = [tokens[0], tokens[-1]]
-    text_tokens[1, : len(tokens)] = tokens
-    text_tokens = torch.tensor(text_tokens, dtype=torch.long).cuda()
+    tokenizer = get_tokenizer(root_dir)
+    tokens = prepare_tokens(tokenizer, args.text)
 
     torch.manual_seed(args.seed)
     model = MinDalle(is_mega=not args.no_mega, root_dir=args.root_dir)
@@ -55,6 +43,10 @@ if __name__ == "__main__":
     # )
 
     start = time.monotonic()
-    image = model.forward(text_tokens, args.grid_size, top_k=args.top_k)
-    Image.fromarray(image.numpy()).save(args.image_path)
+    # image = model.forward(tokens, args.grid_size, top_k=args.top_k)
+    # Image.fromarray(image.numpy()).save(args.image_path)
+    for i, image in enumerate(model.forward(tokens, args.grid_size, top_k=args.top_k, progressive_outputs=True)):
+         Image.fromarray(image.numpy()).save(args.image_path + "_" + str(i) + ".png") 
+
+
     print(f"Time elapsed: {time.monotonic() - start:.4f}s")
