@@ -1,7 +1,7 @@
-from typing import Tuple, List
+from typing import List
 import torch
-from torch import nn, LongTensor, FloatTensor, BoolTensor
-from .bart_encoder import GLU, AttentionBase
+from torch import nn
+from .bart_encoder import GLU
 
 IMAGE_TOKEN_LENGTH = 256
 
@@ -17,13 +17,12 @@ class DecoderCrossAttention(nn.Module):
         self.q_proj = nn.Linear(embed_size, embed_size, bias=False)
         self.out_proj = nn.Linear(embed_size, embed_size, bias=False)
 
-
     def forward(
         self,
-        decoder_state: FloatTensor,
-        encoder_state: FloatTensor,
-        attention_mask: BoolTensor,
-    ) -> FloatTensor:
+        decoder_state,
+        encoder_state,
+        attention_mask,
+    ):
         keys = self.k_proj.forward(encoder_state)
         values = self.v_proj.forward(encoder_state)
         queries = self.q_proj.forward(decoder_state)
@@ -35,12 +34,10 @@ class DecoderCrossAttention(nn.Module):
         queries /= queries.shape[-1] ** 0.5
 
         attention_bias = (1 - attention_mask.to(torch.float32)) * -1e12
-        attention_weights: FloatTensor = torch.einsum("bqhc,bkhc->bhqk", queries, keys)
+        attention_weights = torch.einsum("bqhc,bkhc->bhqk", queries, keys)
         attention_weights += attention_bias[:, None, None, :]
         attention_weights = torch.softmax(attention_weights, -1)
-        attention_output: FloatTensor = torch.einsum(
-            "bhqk,bkhc->bqhc", attention_weights, values
-        )
+        attention_output = torch.einsum("bhqk,bkhc->bqhc", attention_weights, values)
         shape = attention_output.shape[:2] + (self.embed_size,)
         attention_output = attention_output.reshape(shape)
         attention_output = self.out_proj.forward(attention_output)
@@ -60,11 +57,11 @@ class DecoderSelfAttention(nn.Module):
 
     def forward(
         self,
-        decoder_state: FloatTensor,
-        attention_state: FloatTensor,
-        attn_mask: BoolTensor,
-        token_index: LongTensor,
-    ) -> Tuple[FloatTensor, FloatTensor]:
+        decoder_state,
+        attention_state,
+        attn_mask,
+        token_index,
+    ):
         keys = self.k_proj.forward(decoder_state)
         values = self.v_proj.forward(decoder_state)
         queries = self.q_proj.forward(decoder_state)
@@ -82,22 +79,18 @@ class DecoderSelfAttention(nn.Module):
         queries /= queries.shape[-1] ** 0.5
 
         attention_bias = (1 - attn_mask.to(torch.float32)) * -1e12
-        attention_weights: FloatTensor = torch.einsum("bqhc,bkhc->bhqk", queries, keys)
+        attention_weights = torch.einsum("bqhc,bkhc->bhqk", queries, keys)
         attention_weights += attention_bias[:, None, None, :]
         attention_weights = torch.softmax(attention_weights, -1)
-        attention_output: FloatTensor = torch.einsum(
-            "bhqk,bkhc->bqhc", attention_weights, values
-        )
+        attention_output = torch.einsum("bhqk,bkhc->bqhc", attention_weights, values)
         shape = attention_output.shape[:2] + (self.embed_size,)
         attention_output = attention_output.reshape(shape)
-        decoder_state = self.out_proj.forward(attention_output)        
+        decoder_state = self.out_proj.forward(attention_output)
         return decoder_state, attention_state
 
 
 class DecoderLayer(nn.Module):
-    def __init__(
-        self, head_dim: int, embed_size: int, glu_dim: int, device: str
-    ):
+    def __init__(self, head_dim: int, embed_size: int, glu_dim: int, device: str):
         super().__init__()
         self.pre_self_attn_layer_norm = nn.LayerNorm(embed_size)
         self.self_attn = DecoderSelfAttention(head_dim, embed_size)
@@ -110,12 +103,12 @@ class DecoderLayer(nn.Module):
 
     def forward(
         self,
-        decoder_state: FloatTensor,
-        encoder_state: FloatTensor,
-        attention_state: FloatTensor,
-        attention_mask: BoolTensor,
-        token_index: LongTensor,
-    ) -> Tuple[FloatTensor, FloatTensor]:
+        decoder_state,
+        encoder_state,
+        attention_state,
+        attention_mask,
+        token_index,
+    ):
         # Self Attention
         self_attn_mask = self.token_indices < token_index + 1
         self_attn_mask = self_attn_mask[None][[0] * decoder_state.shape[0]]
@@ -183,16 +176,17 @@ class DalleBartDecoder(nn.Module):
 
     def forward(
         self,
-        settings: FloatTensor,
-        attention_mask: BoolTensor,
-        encoder_state: FloatTensor,
-        attention_state: FloatTensor,
-        prev_tokens: LongTensor,
-        token_index: LongTensor,
-    ) -> Tuple[LongTensor, FloatTensor]:
+        settings,
+        attention_mask,
+        encoder_state,
+        attention_state,
+        prev_tokens,
+        token_index,
+    ):
         image_size = encoder_state.shape[0] // 2
         token_index_batched = token_index[[0] * image_size * 2]
-        prev_tokens = prev_tokens[list(range(image_size)) * 2]
+        # prev_tokens = prev_tokens[list(range(image_size)) * 2]
+        prev_tokens = prev_tokens[[x for x in range(image_size)] * 2]
         prev_tokens.clamp_(0, self.image_vocab_size)
         decoder_state = self.embed_tokens.forward(prev_tokens)
         decoder_state += self.embed_positions.forward(token_index_batched)
@@ -211,8 +205,8 @@ class DalleBartDecoder(nn.Module):
         temperature = settings[[0]]
         top_k = settings[[1]].to(torch.long)
         supercondition_factor = settings[[2]]
-        logits = logits[:, -1, : 16384]
-        logits: FloatTensor = (
+        logits = logits[:, -1, :16384]
+        logits = (
             logits[:image_size] * (1 - supercondition_factor)
             + logits[image_size:] * supercondition_factor
         )

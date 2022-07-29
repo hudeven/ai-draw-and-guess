@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from torch import FloatTensor, LongTensor
 from math import sqrt
 
 
@@ -15,7 +14,7 @@ class ResnetBlock(nn.Module):
         self.conv2 = nn.Conv2d(n, n, 3, padding=1)
         self.nin_shortcut = nn.Conv2d(m, n, 1) if not self.is_middle else None
 
-    def forward(self, x: FloatTensor) -> FloatTensor:
+    def forward(self, x):
         h = x
         h = self.norm1.forward(h)
         h *= torch.sigmoid(h)
@@ -38,7 +37,7 @@ class AttentionBlock(nn.Module):
         self.v = nn.Conv2d(n, n, 1)
         self.proj_out = nn.Conv2d(n, n, 1)
 
-    def forward(self, x: FloatTensor) -> FloatTensor:
+    def forward(self, x):
         n, m = 512, x.shape[0]
         h = x
         h = self.norm(h)
@@ -67,7 +66,7 @@ class MiddleLayer(nn.Module):
         self.attn_1 = AttentionBlock()
         self.block_2 = ResnetBlock(9, 9)
     
-    def forward(self, h: FloatTensor) -> FloatTensor:
+    def forward(self, h):
         h = self.block_1.forward(h)
         h = self.attn_1.forward(h)
         h = self.block_2.forward(h)
@@ -81,7 +80,7 @@ class Upsample(nn.Module):
         self.upsample = torch.nn.UpsamplingNearest2d(scale_factor=2)
         self.conv = nn.Conv2d(n, n, 3, padding=1)
 
-    def forward(self, x: FloatTensor) -> FloatTensor:
+    def forward(self, x):
         x = self.upsample.forward(x.to(torch.float32))
         x = self.conv.forward(x)
         return x
@@ -114,7 +113,7 @@ class UpsampleBlock(nn.Module):
         self.upsample = Upsample(log2_dim_out) if has_upsample else None
 
 
-    def forward(self, h: FloatTensor) -> FloatTensor:
+    def forward(self, h):
         if self.attn is not None:
             for j, (block, attn) in enumerate(zip(self.block, self.attn)):
                 h = block.forward(h)
@@ -145,7 +144,7 @@ class Decoder(nn.Module):
         self.norm_out = nn.GroupNorm(32, 128)
         self.conv_out = nn.Conv2d(128, 3, 3, padding=1)
 
-    def forward(self, z: FloatTensor) -> FloatTensor:
+    def forward(self, z):
         z = self.conv_in.forward(z)
         z = self.mid.forward(z)
 
@@ -167,20 +166,41 @@ class VQGanDetokenizer(nn.Module):
         self.post_quant_conv = nn.Conv2d(embed_size, embed_size, 1)
         self.decoder = Decoder()
 
-    def forward(self, is_seamless: bool, z: LongTensor) -> FloatTensor:
+    # def forward(self, is_seamless, z):
+    #     z.clamp_(0, self.vocab_size - 1)
+    #     grid_size = int(sqrt(z.shape[0]))
+    #     token_size = grid_size * 16
+        
+    #     if is_seamless:
+    #         z = z.view([grid_size, grid_size, 16, 16])
+    #         z = z.flatten(1, 2).transpose(1, 0).flatten(1, 2)
+    #         z = z.flatten().unsqueeze(1)
+    #         z = self.embedding.forward(z)
+    #         z = z.view((1, token_size, token_size, 256))
+    #     else:
+    #         z = self.embedding.forward(z)
+    #         z = z.view((z.shape[0], 16, 16, 256))
+
+    #     z = z.permute(0, 3, 1, 2).contiguous()
+    #     z = self.post_quant_conv.forward(z)
+    #     z = self.decoder.forward(z)
+    #     z = z.permute(0, 2, 3, 1)
+    #     z = z.clip(0.0, 1.0) * 255
+
+    #     if is_seamless:
+    #         z = z[0]
+    #     else:
+    #         z = z.view([grid_size, grid_size, 256, 256, 3])
+    #         z = z.flatten(1, 2).transpose(1, 0).flatten(1, 2)
+
+    #     return z
+
+    def forward(self, z):
         z.clamp_(0, self.vocab_size - 1)
         grid_size = int(sqrt(z.shape[0]))
-        token_size = grid_size * 16
         
-        if is_seamless:
-            z = z.view([grid_size, grid_size, 16, 16])
-            z = z.flatten(1, 2).transpose(1, 0).flatten(1, 2)
-            z = z.flatten().unsqueeze(1)
-            z = self.embedding.forward(z)
-            z = z.view((1, token_size, token_size, 256))
-        else:
-            z = self.embedding.forward(z)
-            z = z.view((z.shape[0], 16, 16, 256))
+        z = self.embedding.forward(z)
+        z = z.view((z.shape[0], 16, 16, 256))
 
         z = z.permute(0, 3, 1, 2).contiguous()
         z = self.post_quant_conv.forward(z)
@@ -188,10 +208,6 @@ class VQGanDetokenizer(nn.Module):
         z = z.permute(0, 2, 3, 1)
         z = z.clip(0.0, 1.0) * 255
 
-        if is_seamless:
-            z = z[0]
-        else:
-            z = z.view([grid_size, grid_size, 256, 256, 3])
-            z = z.flatten(1, 2).transpose(1, 0).flatten(1, 2)
-
+        z = z.view([grid_size, grid_size, 256, 256, 3])
+        z = z.flatten(1, 2).transpose(1, 0).flatten(1, 2)
         return z

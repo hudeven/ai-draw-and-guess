@@ -1,6 +1,6 @@
 from typing import List
 import torch
-from torch import nn, BoolTensor, FloatTensor, LongTensor
+from torch import nn
 
 
 class GLU(nn.Module):
@@ -13,7 +13,7 @@ class GLU(nn.Module):
         self.fc1 = nn.Linear(input_dim, middle_dim, bias=False)
         self.fc2 = nn.Linear(middle_dim, input_dim, bias=False)
 
-    def forward(self, z: FloatTensor) -> FloatTensor:
+    def forward(self, z):
         z = self.ln0.forward(z)
         w = self.fc0.forward(z)
         w = self.gelu.forward(w)
@@ -36,23 +36,21 @@ class AttentionBase(nn.Module):
 
     def forward(
         self,
-        keys: FloatTensor,
-        values: FloatTensor,
-        queries: FloatTensor,
-        attention_mask: BoolTensor,
-    ) -> FloatTensor:
+        keys,
+        values,
+        queries,
+        attention_mask,
+    ):
         keys = keys.reshape(keys.shape[:2] + (self.attention_heads, -1))
         values = values.reshape(values.shape[:2] + (self.attention_heads, -1))
         queries = queries.reshape(queries.shape[:2] + (self.attention_heads, -1))
         queries /= queries.shape[-1] ** 0.5
 
-        attention_bias = (1 - attention_mask.to(torch.float32)) * -1e12
-        attention_weights: FloatTensor = torch.einsum("bqhc,bkhc->bhqk", queries, keys)
+        attention_bias = (1 - attention_mask.to(torch.float16)) * -1e12
+        attention_weights = torch.einsum("bqhc,bkhc->bhqk", queries, keys)
         attention_weights += attention_bias[:, None, None, :]
         attention_weights = torch.softmax(attention_weights, -1)
-        attention_output: FloatTensor = torch.einsum(
-            "bhqk,bkhc->bqhc", attention_weights, values
-        )
+        attention_output = torch.einsum("bhqk,bkhc->bqhc", attention_weights, values)
         shape = attention_output.shape[:2] + (self.embed_size,)
         attention_output = attention_output.reshape(shape)
         attention_output = self.out_proj.forward(attention_output)
@@ -70,10 +68,7 @@ class EncoderSelfAttention(nn.Module):
         self.q_proj = nn.Linear(embed_size, embed_size, bias=False)
         self.out_proj = nn.Linear(embed_size, embed_size, bias=False)
 
-
-    def forward(
-        self, encoder_state: FloatTensor, attention_mask: BoolTensor
-    ) -> FloatTensor:
+    def forward(self, encoder_state, attention_mask):
         keys = self.k_proj.forward(encoder_state)
         values = self.v_proj.forward(encoder_state)
         queries = self.q_proj.forward(encoder_state)
@@ -85,13 +80,11 @@ class EncoderSelfAttention(nn.Module):
         queries = queries.reshape(queries.shape[:2] + (self.attention_heads, -1))
         queries /= queries.shape[-1] ** 0.5
 
-        attention_bias = (1 - attention_mask.to(torch.float32)) * -1e12
-        attention_weights: FloatTensor = torch.einsum("bqhc,bkhc->bhqk", queries, keys)
+        attention_bias = (1 - attention_mask.to(torch.float16)) * -1e12
+        attention_weights = torch.einsum("bqhc,bkhc->bhqk", queries, keys)
         attention_weights += attention_bias[:, None, None, :]
         attention_weights = torch.softmax(attention_weights, -1)
-        attention_output: FloatTensor = torch.einsum(
-            "bhqk,bkhc->bqhc", attention_weights, values
-        )
+        attention_output = torch.einsum("bhqk,bkhc->bqhc", attention_weights, values)
         shape = attention_output.shape[:2] + (self.embed_size,)
         attention_output = attention_output.reshape(shape)
         attention_output = self.out_proj.forward(attention_output)
@@ -106,9 +99,7 @@ class EncoderLayer(nn.Module):
         self.self_attn_layer_norm = nn.LayerNorm(embed_size)
         self.glu = GLU(embed_size, glu_dim)
 
-    def forward(
-        self, encoder_state: FloatTensor, attention_mask: BoolTensor
-    ) -> FloatTensor:
+    def forward(self, encoder_state, attention_mask):
         residual = encoder_state
         encoder_state = self.pre_self_attn_layer_norm.forward(encoder_state)
         encoder_state = self.self_attn.forward(encoder_state, attention_mask)
@@ -150,7 +141,7 @@ class DalleBartEncoder(nn.Module):
         token_indices = torch.arange(max_text_length, device=device)
         self.pose_tokens = torch.stack([token_indices] * 2)
 
-    def forward(self, text_tokens: LongTensor) -> FloatTensor:
+    def forward(self, text_tokens):
         attention_mask = text_tokens.not_equal(1)
         encoder_state = self.embed_tokens.forward(
             text_tokens
