@@ -1,6 +1,7 @@
 import base64
 import io
 import logging
+import flask
 
 from PIL import Image
 from collections import defaultdict
@@ -107,6 +108,16 @@ def handle_join_game_event(json, methods=['GET', 'POST']):
     socketio.emit('join-game-event-response', {"players": game_players_map[game_id]}, callback=message_received)
 
 
+import torch
+from modeling.models.dalle.dalle import MinDalle
+from PIL import Image
+
+
+torch.cuda.empty_cache()
+
+model = MinDalle(root_dir='modeling/pretrained',is_mega=False, dtype=torch.float16)
+
+
 @socketio.on('drawer-submit-event')
 def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     logger.info('received drawer-submit-event: ' + str(json))
@@ -118,9 +129,24 @@ def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     # TODO: cache (draw's sentence, output image) for faster demo
     # Mock the output image from text-to-image model
 
-    ai_drawed_image_path = "resources/pytorch_logo.png"
+    # ai_drawed_image_path = "resources/pytorch_logo.png"
+
 
     ######################################################################
+    torch.cuda.empty_cache()
+    
+    text = json["sentence"]
+    image = model.generate_image(
+        text=text,
+        grid_size=1,
+        is_seamless=False,
+        temperature=1,
+        top_k=32,
+        supercondition_factor=16.0,
+    )
+    im = Image.fromarray(image)
+    ai_drawed_image_path = "resources/temp.png"
+    im.save(ai_drawed_image_path)
 
     img = get_encoded_img(ai_drawed_image_path)
     socketio.emit('ai-returns-image-event', img, callback=message_received)
@@ -237,4 +263,4 @@ def get_encoded_img(image_path):
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0', port=5001)
+    socketio.run(app, debug=True, host='0.0.0.0', port=8080)
