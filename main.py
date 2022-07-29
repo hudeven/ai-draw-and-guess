@@ -2,6 +2,7 @@ import base64
 import io
 import logging
 import flask
+import os
 
 from PIL import Image
 from collections import defaultdict
@@ -9,6 +10,30 @@ from difflib import SequenceMatcher
 from flask import Flask, render_template
 from flask_socketio import SocketIO
 import random
+
+
+#######################################################################
+#                   Build tokenizer and model                         #
+#######################################################################
+
+
+import torch
+from modeling.models.dalle.dalle import MinDalle, get_tokenizer, prepare_tokens
+from PIL import Image
+
+
+root_dir = "modeling/pretrained"
+is_mega = False
+
+torch.manual_seed(42)
+tokenizer = get_tokenizer(os.path.join(root_dir, f"dalle_{'mega' if is_mega else 'mini'}"))
+model = MinDalle(is_mega=False, root_dir="modeling/pretrained")
+
+
+#######################################################################
+#                         service endpoints                            #
+#######################################################################
+
 
 app = Flask(__name__)
 logger = app.logger
@@ -23,10 +48,6 @@ game_creator_map = dict()
 game_guesser_sentence_map = defaultdict(dict)  # {game_id: {guesser_name: sentence}}
 game_leaderboard = defaultdict(dict)
 round_leaderboard = defaultdict(dict)
-
-#######################################################################
-#                         service endpoint                            #
-#######################################################################
 
 
 @app.route('/')
@@ -108,16 +129,6 @@ def handle_join_game_event(json, methods=['GET', 'POST']):
     socketio.emit('join-game-event-response', {"players": game_players_map[game_id]}, callback=message_received)
 
 
-import torch
-from modeling.models.dalle.dalle import MinDalle
-from PIL import Image
-
-
-torch.cuda.empty_cache()
-
-model = MinDalle(root_dir='modeling/pretrained',is_mega=False, dtype=torch.float16)
-
-
 @socketio.on('drawer-submit-event')
 def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     logger.info('received drawer-submit-event: ' + str(json))
@@ -136,20 +147,23 @@ def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     torch.cuda.empty_cache()
     
     text = json["sentence"]
-    image = model.generate_image(
-        text=text,
+    tokens = prepare_tokens(tokenizer, text)
+    images = model(
+        tokens,
         grid_size=1,
-        is_seamless=False,
         temperature=1,
         top_k=32,
         supercondition_factor=16.0,
+        progressive_outputs=True,
+        is_seamless= False,
+        is_verbose= True,
     )
-    im = Image.fromarray(image)
-    ai_drawed_image_path = "resources/temp.png"
-    im.save(ai_drawed_image_path)
-
-    img = get_encoded_img(ai_drawed_image_path)
-    socketio.emit('ai-returns-image-event', img, callback=message_received)
+    # ai_drawed_image_path = "resources/temp.png"
+    # im.save(ai_drawed_image_path)
+    
+    for i, image in enumerate(images):
+        encoded_img= get_encoded_img(image_obj=Image.fromarray(image.numpy()))
+        socketio.emit('ai-returns-image-event', encoded_img, callback=message_received)
 
 
 @socketio.on('guesser-submit-event')
@@ -254,8 +268,12 @@ def is_round_end(game_id):
     return num_guesser_sentences == num_guesser
 
 
-def get_encoded_img(image_path):
-    img = Image.open(image_path, mode='r')
+def get_encoded_img(image_path=None, image_obj=None):
+    assert image_path or image_obj
+    if image_path:
+        img = Image.open(image_path, mode='r')
+    else:
+        img = image_obj
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='PNG')
     encoded_img = base64.encodebytes(img_byte_arr.getvalue()).decode('ascii')

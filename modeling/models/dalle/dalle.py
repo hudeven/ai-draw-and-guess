@@ -7,7 +7,7 @@ import json
 from .bart_encoder import DalleBartEncoder
 from .bart_decoder import DalleBartDecoder
 from .vqgan_detokenizer import VQGanDetokenizer
-from models.dalle.text_tokenizer import TextTokenizer
+from .text_tokenizer import TextTokenizer
 
 
 torch.set_grad_enabled(False)
