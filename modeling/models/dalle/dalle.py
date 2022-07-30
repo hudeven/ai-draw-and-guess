@@ -4,6 +4,9 @@ import torch
 import torch.nn as nn
 import torch.backends.cudnn, torch.backends.cuda
 import json
+
+from typing import List
+from torch import Tensor
 from .bart_encoder import DalleBartEncoder
 from .bart_decoder import DalleBartDecoder
 from .vqgan_detokenizer import VQGanDetokenizer
@@ -60,6 +63,7 @@ class MinDalle(nn.Module):
         self.detokenizer.load_state_dict(params)
         self.detokenizer = self.detokenizer.to(device=self.device).eval()
 
+
     def forward(
         self,
         text_tokens,
@@ -70,7 +74,7 @@ class MinDalle(nn.Module):
         progressive_outputs: bool = False,
         is_seamless: bool = False,
         is_verbose: bool = True,
-    ):
+    ) -> List[Tensor]:
         with torch.cuda.amp.autocast(dtype=torch.float16):
             encoder_state = self.encoder.forward(text_tokens)
 
@@ -102,6 +106,28 @@ class MinDalle(nn.Module):
             dtype=torch.float16,
             device=self.device,
         )
+        
+        if progressive_outputs:
+            return self.get_progressive_output(
+                image_tokens,
+                settings,
+                attention_mask,
+                encoder_state,
+                attention_state,
+                token_indices,
+            )
+        
+        return self.get_final_output(
+                image_tokens,
+                settings,
+                attention_mask,
+                encoder_state,
+                attention_state,
+                token_indices,
+            )
+
+    
+    def get_final_output(self, image_tokens, settings, attention_mask, encoder_state, attention_state, token_indices) -> List[Tensor]:
         for i in range(256):
             with torch.cuda.amp.autocast(dtype=torch.float16):
                 image_tokens[i + 1], attention_state = self.decoder.forward(
@@ -113,18 +139,33 @@ class MinDalle(nn.Module):
                     token_index=token_indices[[i]],
                 )
 
-            with torch.cuda.amp.autocast(dtype=torch.float32):
-                if ((i + 1) % 32 == 0 and progressive_outputs) or i + 1 == 256:
+        image = self.detokenizer.forward(image_tokens[1:].T)
+        image = image.to(torch.uint8).to("cpu")
+        return [image]
+
+    
+    @torch.jit.unused
+    def get_progressive_output(self, image_tokens, settings, attention_mask, encoder_state, attention_state, token_indices) -> List[Tensor]:
+        for i in range(256):
+            with torch.cuda.amp.autocast(dtype=torch.float16):
+                image_tokens[i + 1], attention_state = self.decoder.forward(
+                    settings=settings,
+                    attention_mask=attention_mask,
+                    encoder_state=encoder_state,
+                    attention_state=attention_state,
+                    prev_tokens=image_tokens[i],
+                    token_index=token_indices[[i]],
+                )
+
+            if ((i + 1) % 32 == 0) or i + 1 == 256:
+                with torch.cuda.amp.autocast(dtype=torch.float32):
                     yield self.image_grid_from_tokens(
                         image_tokens=image_tokens[1:].T,
-                        is_seamless=is_seamless,
-                        is_verbose=is_verbose
+                        is_seamless=False,
+                        is_verbose=True,
                     )
-        # image = self.detokenizer.forward(image_tokens[1:].T)
-        # image = image.to(torch.uint8).to("cpu")
-        # return image
 
-
+                    
     def image_grid_from_tokens(
         self,
         image_tokens,
