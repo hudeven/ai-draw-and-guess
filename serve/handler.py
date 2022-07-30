@@ -1,9 +1,15 @@
+import sys
 import torch
 import os
 import zipfile
+
+from PIL import Image
 from io import BytesIO
 from torchvision.utils import save_image
 from ts.torch_handler.base_handler import BaseHandler
+
+sys.path.append("../modeling")
+
 
 ZIPFILE = "model_and_pretrained.zip"
 
@@ -28,8 +34,10 @@ class ModelHandler(BaseHandler):
             model_dir = properties.get("model_dir")
             gpu_id = properties.get("gpu_id")
         else:
-            model_dir = "."
+            model_dir = "../modeling"
 
+#        sys.path.append(model_dir)
+        
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         # If not already extracted, Extract model source code and pretrained checkpoint
@@ -38,17 +46,14 @@ class ModelHandler(BaseHandler):
                 zip_ref.extractall(model_dir)
 
         # Load Model
-        from models.dalle.dalle import MinDalle
+        from models.dalle.dalle import MinDalle, get_tokenizer
+        
         print("import dalle")
-
-        self.model = MinDalle(
-            is_mega=True,  # TODO: need udpate
-            root_dir=model_dir + "/pretrained",
-            device=self.device,
-            dtype=torch.float16,
-        )
-        # state_dict = torch.load(model_dir + "/" + CHECKPOINT, map_location=self.map_location)
-        # self.dcgan_model.load_state_dict(state_dict)
+        
+        self.tokenizer = get_tokenizer(os.path.join(model_dir, "pretrained/dalle_mega"))
+        torch.manual_seed(42)
+        self.model = MinDalle(is_mega=True, root_dir=os.path.join(model_dir, "pretrained"))
+        self.model.eval()
 
         self.initialized = True
 
@@ -57,17 +62,20 @@ class ModelHandler(BaseHandler):
         Build noise data by using "number of images" and other "constraints" provided by the end user.
         """
         print("preprocess")
+        
+        from models.dalle.dalle import prepare_tokens
+        
         preprocessed_data = []
+            
         for req in requests:
             data = (
                 req.get("data") if req.get("data") is not None else req.get("body", {})
             )
-
-            input_text = data.get(
-                "input_text", ""
-            )  # TODO: could replace with better default input text
-
-            preprocessed_data.append({"input": input_text})
+            if isinstance(data, (bytes, bytearray)):
+                data = data.decode("utf-8")
+            tokens = prepare_tokens(self.tokenizer, data)
+            preprocessed_data.append({"input": tokens})
+        
         return preprocessed_data
 
     def inference(self, preprocessed_data, *args, **kwargs):
@@ -79,9 +87,10 @@ class ModelHandler(BaseHandler):
         # with torch.no_grad():
         #     image_tensor = self.dcgan_model.test(input_batch, getAvG=True, toCPU=True)
         # output_batch = torch.split(image_tensor, tuple(map(lambda d: d["number_of_images"], preprocessed_data)))
-        input_text = list(map(lambda d: d["input"], preprocessed_data))[-1]
-        output_img = self.model.generate_image(input_text, self.grid_size, top_k=self.top_k)
-        return [output_img]
+
+        tokens = list(map(lambda d: d["input"], preprocessed_data))[-1]
+        output_img = self.model(tokens, grid_size=3, top_k=256, progressive_outputs=False)
+        return list(output_img)
 
     def postprocess(self, output_batch):
         """
@@ -91,18 +100,20 @@ class ModelHandler(BaseHandler):
         postprocessed_data = []
         for op in output_batch:
             fp = BytesIO()
-            op.save(fp, 'PNG')
+            Image.fromarray(op.numpy()).save(fp, 'PNG')
+            Image.fromarray(op.numpy()).save("temp.png", 'PNG')
             postprocessed_data.append(fp.getvalue())
             fp.close()
         return postprocessed_data
 
-# if __name__ == "__main__":
-#     handler = ModelHandler()
-#     handler.initialize(None)
-#     print("initialization is done. ")
-#     preprocess_data = handler.preprocess([{"data": {"input_text": "a dog in water"}}])
-#     print("preprocess data is done. ")
-#     output = handler.inference(preprocess_data)
-#     print("inference is done. ")
-#     post_output = handler.postprocess(output)
-#     print("Generated and saved images")
+    
+if __name__ == "__main__":
+    handler = ModelHandler()
+    handler.initialize(None)
+    print("initialization is done. ")
+    preprocess_data = handler.preprocess([{"data": {"input_text": "a cat and a dog in water"}}])
+    print("preprocess data is done. ")
+    output = handler.inference(preprocess_data)
+    print("inference is done. ")
+    post_output = handler.postprocess(output)
+    print("Generated and saved images")

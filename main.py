@@ -2,6 +2,7 @@ import base64
 import io
 import logging
 import requests
+import os
 
 from PIL import Image
 from collections import defaultdict
@@ -16,17 +17,17 @@ import random
 #######################################################################
 
 
-import torch
-from modeling.models.dalle.dalle import MinDalle, get_tokenizer, prepare_tokens
-from PIL import Image
+# import torch
+# from modeling.models.dalle.dalle import MinDalle, get_tokenizer, prepare_tokens
+# from PIL import Image
 
 
-root_dir = "modeling/pretrained"
-is_mega = False
+# root_dir = "modeling/pretrained"
+# is_mega = False
 
-torch.manual_seed(42)
-tokenizer = get_tokenizer(os.path.join(root_dir, f"dalle_{'mega' if is_mega else 'mini'}"))
-model = MinDalle(is_mega=False, root_dir="modeling/pretrained")
+# torch.manual_seed(42)
+# tokenizer = get_tokenizer(os.path.join(root_dir, f"dalle_{'mega' if is_mega else 'mini'}"))
+# model = MinDalle(is_mega=False, root_dir="modeling/pretrained")
 
 
 #######################################################################
@@ -141,9 +142,14 @@ def handle_drawer_submit_event(json, methods=['GET', 'POST']):
 
     if request.method == "GET":
         input_text = game_sentences_map[json["game_id"]][0] # assume first sentence is input
+        
+        logger.warning(f"input_text: {input_text}")
+        
         # url = "http://localhost:8080/predictions/dalle_image_gen" # for dalle_image
-        url = "http://localhost:8080/predictions/dalle_image" # for dalle_image_mini
-        response = requests.get(url, data={'input_text':input_text})
+        url = "http://localhost:8080/predictions/dalle_mega" # for dalle_image_mini
+        response = requests.post(url, data=input_text)
+        
+        logger.warning(f"torchserve response: {response}")
 
         ######################################################################
 
@@ -258,4 +264,4 @@ def get_encoded_img(img):
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0', port=8080)
+    socketio.run(app, debug=True, host='0.0.0.0', port=9000)
