@@ -27,6 +27,13 @@
 
 <h2>Leaderboard</h2>
 <div id="game_leaderboard"></div>
+    
+<label for="models">Choose a model:</label>
+
+<select id="model_name">
+  <option value="dalle_mini">DALL·E mini (torchserve)</option>
+  <option value="dalle_mega">DALL·E mega (torchserve)</option>
+</select>
 
 <script type="text/javascript">
     var game_id = $('#game_id').text()
@@ -39,10 +46,13 @@
       var sentence = $('input.sentence').val()
       var drawer_name = $('#drawer_name').text()
       if (drawer_name == user_name) {
+          var model_name = $('#model_name').val()
+          console.log(`selected model: ${model_name}`)
           socket.emit('drawer-submit-event', {
               game_id: game_id,
               user_name: user_name,
-              sentence: sentence
+              sentence: sentence,
+              model_name: model_name,
           })
       } else {
          socket.emit('guesser-submit-event', {

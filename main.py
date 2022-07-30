@@ -136,25 +136,15 @@ def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     game_sentences_map[json["game_id"]].append(json["sentence"])
     socketio.emit('drawer-submit-event-response', json, callback=message_received)
 
-    # TODO: call text-to-image model and save output image to ai_drawed_image_path
     # TODO: cache (draw's sentence, output image) for faster demo
-    # Mock the output image from text-to-image model
+    input_text = game_sentences_map[json["game_id"]][0] # assume first sentence is input
+    model_name = json["model_name"]
 
-    if request.method == "GET":
-        input_text = game_sentences_map[json["game_id"]][0] # assume first sentence is input
-        
-        logger.warning(f"input_text: {input_text}")
-        
-        # url = "http://localhost:8080/predictions/dalle_image_gen" # for dalle_image
-        url = "http://localhost:8080/predictions/dalle_mega" # for dalle_image_mini
-        response = requests.post(url, data=input_text)
-        
-        logger.warning(f"torchserve response: {response}")
+    url = f"http://localhost:8080/predictions/{model_name}" # for dalle_image_mini
+    response = requests.post(url, data=input_text)
 
-        ######################################################################
-
-        img = get_encoded_img(response.content)
-        socketio.emit('ai-returns-image-event', img, callback=message_received)
+    img = get_encoded_img(response.content)
+    socketio.emit('ai-returns-image-event', img, callback=message_received)
 
 
 @socketio.on('guesser-submit-event')
