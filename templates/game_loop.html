@@ -18,10 +18,11 @@
 </h1>
 
 <div id="image_display"></div>
-<div id="log_display">Waiting for drawer {{ drawer_name }} to enter a sentence...</div>
-
+<div id="log_display">Round {{round_id}}<br>
+    Waiting for drawer <b> {{ drawer_name }} </b> to enter a sentence...
+</div>
 <form action="" method="POST">
-    <input type="text" class="sentence" placeholder="Enter a sentence" style="width: 600px"/>
+    <input type="text" id="input_sentence" placeholder="Enter a sentence" style="width: 600px"/>
     <input type="submit"/>
 </form>
 
@@ -38,12 +39,16 @@
 <script type="text/javascript">
     var game_id = $('#game_id').text()
     var user_name = $('#user_name').text()
-
+    var drawer_name = $('#drawer_name').text()
+    if (drawer_name != user_name) {
+        $("#input_sentence").prop("disabled", true)
+    }
     var socket = io.connect('http://' + document.domain + ':' + location.port);
 
     $('form').on('submit', function(e) {
       e.preventDefault()
-      var sentence = $('input.sentence').val()
+      var sentence = $('#input_sentence').val()
+      // as #drawer_name might be updated, we need to get the lastest value
       var drawer_name = $('#drawer_name').text()
       if (drawer_name == user_name) {
           var model_name = $('#model_name').val()
@@ -62,14 +67,16 @@
           })
       }
 
-      $('input.sentence').val('').focus()
+      $('#sentence').val('').focus()
     })
 
     socket.on('drawer-submit-event-response', function(msg) {
       console.log(msg)
-      if (typeof msg !== 'undefined') {
-          $('#log_display').append('<div><b style="color: #000">' + msg.user_name + '</b> ' + msg.sentence + '</div>')
-      }
+      $('#log_display').append('<div><b style="color: #000">' + msg.user_name + '</b> ' + msg.sentence + '</div>')
+        
+      // guessers can start typing now
+      $("#input_sentence").prop("disabled", false)
+
     })
 
     socket.on('ai-returns-image-event', function(data) {
@@ -118,9 +125,13 @@
     // Refresh page to the next round
     socket.on('start-new-round-event', function(msg) {
         $('#log_display').append(`<br><br><div>Started round ${msg.round_id}</div>`)
-        $('#log_display').append(`<div>Waiting for drawer ${msg.drawer_name} to enter a sentence</div>`)
+        $('#log_display').append(`<div>Waiting for drawer <b> ${msg.drawer_name} </b> to enter a sentence...</div>`)
         $('#round_id').text(msg.round_id)
         $('#drawer_name').text(msg.drawer_name)
+        
+        if (msg.drawer_name != user_name) {
+            $("#input_sentence").prop("disabled", true)
+        }
     })
 
 </script>
