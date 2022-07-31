@@ -176,13 +176,9 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
     guess_sentence = json["sentence"]
     game_guesser_sentence_map[game_id][user_name] = guess_sentence
     correct_sentence = game_sentences_map[game_id][0]
-
-    # TODO: call text-similarity model to calculate the score
-    score = SequenceMatcher(None, correct_sentence, guess_sentence).ratio() * 10
-    ######################################################################
+    score = calculate_score(correct_sentence, guess_sentence)
 
     update_leaderboards(game_id, user_name, score)
-
     round_end = is_round_end(game_id)
     json["is_round_end"] = round_end
     if round_end:
@@ -218,6 +214,13 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
 #######################################################################
 #                         helper functions                            #
 #######################################################################
+
+
+def calculate_score(correct_sentence, guess_sentence):
+    # TODO: call text-similarity model to calculate the score
+    score = SequenceMatcher(None, correct_sentence, guess_sentence).ratio()
+    score = round(score * 10, 1)
+    return  score
 
 
 def get_drawer_score(game_id):
