@@ -17,6 +17,7 @@
     Drawer: <span id="drawer_name">{{ drawer_name }}</span>
 </h1>
 
+<div id="loading"></div>
 <div id="image_display"></div>
 <div id="log_display">Round {{round_id}}<br>
     Waiting for drawer <b> {{ drawer_name }} </b> to enter a sentence...
@@ -73,14 +74,16 @@
     socket.on('drawer-submit-event-response', function(msg) {
       console.log(msg)
       $('#log_display').append('<div><b style="color: #000">' + msg.user_name + '</b> ' + msg.sentence + '</div>')
-      $('#image_display').html('<div id="loading"><img width="600" height="600" src="/static/loading_img.gif" alt="" /><p>AI is busy!</p></div>')
+      $('#loading').append('<div><img width="400" height="400" src="/static/loading_img.gif" alt="" /><p>AI is busy!</p></div>')
       // guessers can start typing now
       $("#input_sentence").prop("disabled", false)
 
     })
 
     socket.on('ai-returns-image-event', function(data) {
-        $('#image_display').html("<div><img width='600' height='400' src='data:image/png;base64, " + data + "'/></div>")
+        // need clean up loading image
+        //  $('#loading').empty()
+        $('#image_display').append("<div><img width='600' height='400' src='data:image/png;base64, " + data + "'/></div>")
     })
 
     socket.on('round-end-event', function(data) {
