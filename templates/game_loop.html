@@ -94,6 +94,7 @@
         $('#log_display').append(
             `<div>Drawer <b>${msg.drawer_name}</b>: I submitted a sentence</div>`
         )
+        $('#log_display').scrollTop($('#log_display')[0].scrollHeight)
 
     })
 
@@ -127,7 +128,8 @@
             }
             $('#log_display').append(`<div style="color:red;">Round ${msg.round_id} ended!</div><br>`)
         }
-
+        $('#log_display').scrollTop($('#log_display')[0].scrollHeight)
+        
         $('#game_leaderboard').empty()
         $('#game_leaderboard').append(`<div>Player &emsp;&emsp;&emsp; Score</div>`)
         for (let i = 0; i < msg.game_leaderboard.length; i++) {
@@ -143,6 +145,7 @@
         $('#drawer_name').text(msg.drawer_name)
         
         $('#log_display').append(`<div>Round ${msg.round_id} started!</div>`)
+        $('#log_display').scrollTop($('#log_display')[0].scrollHeight)
         
         if (msg.drawer_name != user_name) {
             $("#input_sentence").prop("disabled", true)
