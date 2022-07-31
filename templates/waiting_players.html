@@ -7,20 +7,25 @@
 </head>
 
 <body>
-<h1>
+<h3>
     Username: <span id="user_name">{{ user_name }}</span>
     <br>
     GameId: <span id="game_id">{{ game_id }}</span>
     <br>
     Creator: <span id="creator">{{ creator }}</span>
-</h1>
-<h3>Player List</h3>
+</h3>
+<h2>Player List</h2>
 <div id="players"></div>
 <br><br><br>
 
 {% if creator == user_name %}
     <button id="start_game">Start Game</button>
 {% endif %}
+
+<br><br><br>
+<h3>Game Rules:</h3>
+<pre>{{game_rules}}</pre>
+
 <script type="text/javascript">
     var game_id = $('#game_id').text()
     var user_name = $('#user_name').text()

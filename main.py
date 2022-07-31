@@ -49,6 +49,15 @@ game_guesser_sentence_map = defaultdict(dict)  # {game_id: {guesser_name: senten
 game_leaderboard = defaultdict(dict)
 round_leaderboard = defaultdict(dict)
 
+game_rules = """
+    1. We have N players join the game. N >= 2.
+    2. A drawer will be randomly selected, the others become guessers.
+    3. The drawer enters a sentence to start a round.
+    4. AI will generate an image from the sentence and show it to all guessers.
+    5. Each guesser enters a guessing sentence according to the image.
+    6. Show a leaderboard with each guesser’s score(similarity to the correct sentence).
+    7. Round ends. Start a new round and goto 2.
+"""
 
 @app.route('/')
 def index():
@@ -66,7 +75,13 @@ def welcome(user_name):
 def create_game(game_id, user_name):
     logger.info(f"User {user_name} created game {game_id}")
     game_creator_map[game_id] = user_name
-    return render_template('waiting_players.html', game_id=game_id, user_name=user_name, creator=user_name)
+    return render_template(
+        'waiting_players.html',
+        game_id=game_id,
+        user_name=user_name,
+        creator=user_name,
+        game_rules=game_rules,
+    )
 
 
 @app.route('/join_game/<game_id>/<user_name>', methods=['GET'])
@@ -75,7 +90,13 @@ def join_game(game_id, user_name):
         logger.error(f"Invalid game_id: {game_id}")
         return
     creator = game_creator_map[game_id]
-    return render_template('waiting_players.html', game_id=game_id, user_name=user_name, creator=creator)
+    return render_template(
+        'waiting_players.html',
+        game_id=game_id,
+        user_name=user_name,
+        creator=creator,
+        game_rules=game_rules,
+    )
 
 
 @app.route('/game_loop/<game_id>/<user_name>', methods=['GET', 'POST'])

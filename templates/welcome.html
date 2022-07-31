@@ -17,9 +17,9 @@
 <h1>Welcome <span id="user_name">{{ user_name }}</span></h1>
 <button id="create_game">Create a game</button>
 <h3> Or </h3>
-<input type="text" id="game_id" placeholder="Get the game id from your host"/>
+<input type="text" id="game_id" placeholder="Enter the game id"/>
 <button id="join_game">Join a game</button>
-
+    
 <script type="text/javascript">
     $('#create_game').on('click', function(e) {
         var game_id = guidGenerator(length=4)
