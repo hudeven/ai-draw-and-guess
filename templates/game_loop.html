@@ -7,36 +7,49 @@
 </head>
 
 <body>
-<h1>
-    Username: <span id="user_name">{{ user_name }}</span>
-    <br>
-    GameId: <span id="game_id">{{ game_id }}</span>
-    <br>
-    Round: <span id="round_id">{{ round_id }}</span>
-    <br>
-    Drawer: <span id="drawer_name">{{ drawer_name }}</span>
-</h1>
+<p>
+    Username: <b><span id="user_name">{{ user_name }}</span></b>&emsp;
+    GameId: <b><span id="game_id">{{ game_id }}</span></b>&emsp;
+    Drawer: <b><span id="drawer_name">{{ drawer_name }}</span></b>&emsp;
+    <br><br>
+    Round: <b><span id="round_id">{{ round_id }}</span></b>
+</p>
 
-<div id="loading"></div>
 <div id="image_display"></div>
-<div id="log_display">Round {{round_id}}<br>
-    Waiting for drawer <b> {{ drawer_name }} </b> to enter a sentence...
-</div>
+<font size="6">
+    <div id="guide_display">
+        {% if user_name == drawer_name %}
+            Your are the Drawer! Please enter a sentence...
+        {% else %}
+            Drawer <b> {{ drawer_name }} </b> is typing a sentence...
+        {% endif %}
+    </div>
+</font>
+
+<br>
+<div id="log_display" style="width:600px;height:400px;line-height:1em;overflow:auto;padding:5px;border:4px double"></div>
+    
+    
+<br>
 <form action="" method="POST">
     <input type="text" id="input_sentence" placeholder="Enter a sentence" style="width: 600px"/>
     <input type="submit"/>
 </form>
 
+<br><br>
 <h2>Leaderboard</h2>
 <div id="game_leaderboard"></div>
 
-<label for="models">Choose a model:</label>
-
-<select id="model_name">
-  <option value="dalle_mini">DALL·E mini (torchserve)</option>
-  <option value="dalle_mega">DALL·E mega (torchserve)</option>
-</select>
-
+<br><br><br><br><br><br><br><br>
+<div id="log_display" style="width:600px;height:100px;line-height:1em;overflow:auto;padding:5px;border:4px double;background-color:#E8E8E8">
+    <h2>Control Panel</h2>
+    <label for="models">Choose a model:</label>
+    <select id="model_name">
+      <option value="dalle_mini">DALL·E mini (torchserve)</option>
+      <option value="dalle_mega">DALL·E mega (torchserve)</option>
+    </select>
+</div>
+    
 <script type="text/javascript">
     var game_id = $('#game_id').text()
     var user_name = $('#user_name').text()
@@ -56,7 +69,7 @@
           console.log(`selected model: ${model_name}`)
           socket.emit('drawer-submit-event', {
               game_id: game_id,
-              user_name: user_name,
+              drawer_name: user_name,
               sentence: sentence,
               model_name: model_name,
           })
@@ -64,7 +77,7 @@
          socket.emit('guesser-submit-event', {
               game_id: game_id,
               user_name: user_name,
-              sentence: sentence
+              sentence: sentence,
           })
       }
 
@@ -72,48 +85,47 @@
     })
 
     socket.on('drawer-submit-event-response', function(msg) {
-      console.log(msg)
-      $('#log_display').append('<div><b style="color: #000">' + msg.user_name + '</b> ' + msg.sentence + '</div>')
-      $('#loading').append('<div><img width="400" height="400" src="/static/loading_img.gif" alt="" /><p>AI is busy!</p></div>')
-      // guessers can start typing now
-      $("#input_sentence").prop("disabled", false)
+        console.log(msg)
+        $('#image_display').html('<img width="400" height="400" src="/static/loading_img.gif" alt="" />')
+        $('#guide_display').text('AI is drawing!')
+        // guessers can start typing now
+        $("#input_sentence").prop("disabled", false)
+        
+        $('#log_display').append(
+            `<div>Drawer <b>${msg.drawer_name}</b>: I submitted a sentence</div>`
+        )
 
     })
 
     socket.on('ai-returns-image-event', function(data) {
-        // need clean up loading image
-        //  $('#loading').empty()
-        $('#image_display').append("<div><img width='600' height='400' src='data:image/png;base64, " + data + "'/></div>")
-    })
+        $('#image_display').html("<div><img width='600' height='400' src='data:image/png;base64, " + data + "'/></div>")
 
-    socket.on('round-end-event', function(data) {
-        var round_id = data.round_id
-        $('#log_display').append(`<div>Round ${round_id} ended!</div>`)
+        var drawer_name = $('#drawer_name').text()
+        if (drawer_name == user_name) {
+            display = "Waiting for guessers to enter their sentences"
+        } else {
+            display = "Enter your guess!"
+        }
+        $('#guide_display').text(display)
     })
 
     socket.on('guesser-submit-event-response', function(msg) {
         console.log(msg)
         $('#log_display').append(
-            `<div>Guesser: <b>${msg.user_name}</b> score: ${msg.score} Sentence: ${msg.sentence}</div>`
+            `<div>Guesser <b>${msg.user_name}</b>: ${msg.sentence} &emsp; (score <span style="color: blue">${msg.score}</span>)</div>`
         )
 
         if (msg.is_round_end) {
             if (msg.is_drawer_win) {
                 $('#log_display').append(
-                    `<div>Drawer <b>${msg.drawer_name}</b> gets score: ${msg.drawer_score} because no one guessed the sentence: ${msg.sentence}</div>`
+                    `<div>Drawer <b>${msg.drawer_name}</b>: I got score <span style="color: blue">${msg.drawer_score}</span> as no one guessed my sentence: <b>${msg.sentence}</b></div>`
                 )
             } else {
                 $('#log_display').append(
-                    `<div>Drawer <b>${msg.drawer_name}</b> gets score: ${msg.drawer_score} because the sentence is guessed: ${msg.sentence}</div>`
+                    `<div>Drawer <b>${msg.drawer_name}</b>: I got score <span style="color: blue">${msg.drawer_score}</span> as you guessed my sentence: <b>${msg.sentence}</b></div>`
                 )
             }
-
-            $('#log_display').append(`<div>Leaderboard for round ${msg.round_id}</div>`)
-            for (let i = 0; i < msg.round_leaderboard.length; i++) {
-                $('#log_display').append(
-                    `<div>${msg.round_leaderboard[i][0]} &emsp;&emsp;&emsp;&emsp;&emsp; ${msg.round_leaderboard[i][1]}</div>`
-                )
-            }
+            $('#log_display').append(`<div style="color:red;">Round ${msg.round_id} ended!</div><br>`)
         }
 
         $('#game_leaderboard').empty()
@@ -127,13 +139,16 @@
 
     // Refresh page to the next round
     socket.on('start-new-round-event', function(msg) {
-        $('#log_display').append(`<br><br><div>Started round ${msg.round_id}</div>`)
-        $('#log_display').append(`<div>Waiting for drawer <b> ${msg.drawer_name} </b> to enter a sentence...</div>`)
         $('#round_id').text(msg.round_id)
         $('#drawer_name').text(msg.drawer_name)
-
+        
+        $('#log_display').append(`<div>Round ${msg.round_id} started!</div>`)
+        
         if (msg.drawer_name != user_name) {
             $("#input_sentence").prop("disabled", true)
+            $('#guide_display').html(`Drawer <b>${msg.drawer_name}</b> is typing a sentence...`)
+        } else {
+            $('#guide_display').html(`Your are the Drawer! Please enter a sentence...`)
         }
     })
 
