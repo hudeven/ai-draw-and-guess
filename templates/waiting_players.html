@@ -9,7 +9,7 @@
 <body>
 <h1 style="text-align: center">AI Draw and Guess</h1>
     
-<p>
+<p hidden>
     Username: <b><span id="user_name">{{ user_name }}</span></b>&emsp;
     GameId: <b><span id="game_id">{{ game_id }}</span></b>&emsp;
     Creator: <b><span id="creator">{{ creator }}</span></b>&emsp;
@@ -19,7 +19,7 @@
 </h2>
     
 <h2>Players</h2>
-<div id="players"></div>
+<div id="players" style="width:600px;height:200px;line-height:1em;overflow:auto;padding:5px;border:4px double"></div>
 <br><br><br>
 
 {% if creator == user_name %}
@@ -51,7 +51,7 @@
             $('#players').empty()
             for (let i = 0; i < msg.players.length; i++) {
                 console.log("add player: " + msg.players[i])
-                $('#players').append('<div><b style="color: #000">' + msg.players[i] + '</b> joined</div>')
+                $('#players').append('<div><b style="color: blue">' + msg.players[i] + '</b></div>')
             }
         } else {
             console.log("player_list is empty")
