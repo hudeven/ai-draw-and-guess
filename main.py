@@ -61,8 +61,9 @@ game_rules = """
 
 @app.route('/')
 def index():
-    logger.info("hello!")
-    return render_template('index.html')
+    num_games=len(game_players_map)
+    num_players = sum([len(players) for players in game_players_map.values()])
+    return render_template('index.html', num_games=num_games, num_players=num_players)
 
 
 @app.route('/welcome/<user_name>', methods=['GET'])
