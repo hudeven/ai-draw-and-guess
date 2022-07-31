@@ -28,7 +28,7 @@
 
 <h2>Leaderboard</h2>
 <div id="game_leaderboard"></div>
-    
+
 <label for="models">Choose a model:</label>
 
 <select id="model_name">
@@ -73,7 +73,7 @@
     socket.on('drawer-submit-event-response', function(msg) {
       console.log(msg)
       $('#log_display').append('<div><b style="color: #000">' + msg.user_name + '</b> ' + msg.sentence + '</div>')
-        
+      $('#image_display').html('<div id="loading"><img width="600" height="600" src="/static/loading_img.gif" alt="" /><p>AI is busy!</p></div>')
       // guessers can start typing now
       $("#input_sentence").prop("disabled", false)
 
@@ -128,7 +128,7 @@
         $('#log_display').append(`<div>Waiting for drawer <b> ${msg.drawer_name} </b> to enter a sentence...</div>`)
         $('#round_id').text(msg.round_id)
         $('#drawer_name').text(msg.drawer_name)
-        
+
         if (msg.drawer_name != user_name) {
             $("#input_sentence").prop("disabled", true)
         }
