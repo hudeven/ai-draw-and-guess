@@ -220,7 +220,8 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
         json["round_id"] = round_id_map[game_id]
         json["drawer_name"] = drawer_name
         json["drawer_score"] = drawer_score
-        json["is_drawer_win"] = game_leaderboard[game_id][drawer_name] == 10
+        json["is_drawer_win"] = round_leaderboard[game_id][drawer_name] == 10
+        json["correct_sentence"] = correct_sentence
 
     game_leaderboard_sorted = sorted(game_leaderboard[game_id].items(), key=lambda x: x[1], reverse=True)
     round_leaderboard_sorted = sorted(round_leaderboard[game_id].items(), key=lambda x: x[1], reverse=True)

@@ -125,11 +125,11 @@
         if (msg.is_round_end) {
             if (msg.is_drawer_win) {
                 $('#log_display').append(
-                    `<div>Drawer <b>${msg.drawer_name}</b>: I got score <b style="color: blue">${msg.drawer_score}</b> as no one guessed my sentence: <b style="color: blue">${msg.sentence}</b></div>`
+                    `<div>Drawer <b>${msg.drawer_name}</b>: I got score <b style="color: blue">${msg.drawer_score}</b> as no one guessed my sentence: <b style="color: blue">${msg.correct_sentence}</b></div>`
                 )
             } else {
                 $('#log_display').append(
-                    `<div>Drawer <b>${msg.drawer_name}</b>: I got score <b style="color: blue">${msg.drawer_score}</b> as you guessed my sentence: <b style="color: blue">${msg.sentence}</b></div>`
+                    `<div>Drawer <b>${msg.drawer_name}</b>: I got score <b style="color: blue">${msg.drawer_score}</b> as you guessed my sentence: <b style="color: blue">${msg.correct_sentence}</b></div>`
                 )
             }
             $('#log_display').append(`<div style="color:red;">Round ${msg.round_id} ended!</div><br>`)
