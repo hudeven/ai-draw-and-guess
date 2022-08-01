@@ -162,6 +162,17 @@ def handle_join_game_event(json, methods=['GET', 'POST']):
     )
 
 
+@socketio.on('join-room-event')
+def handle_join_room_event(json):
+    logger.info('handle join-room-event: ' + str(json))
+    user_name = json["user_name"]
+    game_id = json["game_id"]
+    # each user joins a room and related events will broadcast to the room
+    join_room(game_id)
+    logger.info(f"User {user_name} joined room {game_id}")
+    
+
+
 @socketio.on('drawer-submit-event')
 def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     logger.info('received drawer-submit-event: ' + str(json))

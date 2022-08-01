@@ -16,6 +16,8 @@
 </p>
 
 <div id="image_display"></div>
+<br>
+    
 <font size="6">
     <div id="guide_display">
         {% if user_name == drawer_name %}
@@ -58,7 +60,10 @@
         $("#input_sentence").prop("disabled", true)
     }
     var socket = io.connect('http://' + document.domain + ':' + location.port);
-
+    socket.on('connect', function() {
+        socket.emit('join-room-event', {game_id: game_id, user_name: user_name})
+    })
+    
     $('form').on('submit', function(e) {
       e.preventDefault()
       var sentence = $('#input_sentence').val()
