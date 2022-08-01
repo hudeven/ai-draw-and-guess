@@ -1,3 +1,4 @@
+import io
 import os
 import numpy
 import torch
@@ -5,6 +6,7 @@ import torch.nn as nn
 import torch.backends.cudnn, torch.backends.cuda
 import json
 
+from PIL import Image
 from typing import List
 from torch import Tensor
 from .bart_encoder import DalleBartEncoder
@@ -27,6 +29,7 @@ class MinDalle(nn.Module):
         self.is_reusable = is_reusable
 
         root_dir = os.path.join(root_dir, f"dalle_{'mega' if is_mega else 'mini'}")
+        self.root_dir = root_dir
         with open(os.path.join(root_dir, "config.json"), "r") as f:
             self.config = json.load(f)
 
@@ -57,9 +60,12 @@ class MinDalle(nn.Module):
         self.decoder.load_state_dict(params, strict=False)
         self.decoder = self.decoder.to(torch.float16).to(device=self.device).eval()
 
-        # Initialize detokenizer
+        if is_reusable:
+            self.init_detokenizer()
+
+    def init_detokenizer(self):
         self.detokenizer = VQGanDetokenizer()
-        params = torch.load(os.path.join(root_dir, "detoker.pt"))
+        params = torch.load(os.path.join(self.root_dir, "detoker.pt"))
         self.detokenizer.load_state_dict(params)
         self.detokenizer = self.detokenizer.to(device=self.device).eval()
 
@@ -147,6 +153,7 @@ class MinDalle(nn.Module):
     @torch.jit.unused
     def get_progressive_output(self, image_tokens, settings, attention_mask, encoder_state, attention_state, token_indices) -> List[Tensor]:
         for i in range(256):
+            torch.cuda.empty_cache()
             with torch.cuda.amp.autocast(dtype=torch.float16):
                 image_tokens[i + 1], attention_state = self.decoder.forward(
                     settings=settings,
@@ -158,6 +165,7 @@ class MinDalle(nn.Module):
                 )
 
             if ((i + 1) % 32 == 0) or i + 1 == 256:
+                print(f"yield progressive output: {i}")
                 with torch.cuda.amp.autocast(dtype=torch.float32):
                     yield self.image_grid_from_tokens(
                         image_tokens=image_tokens[1:].T,
@@ -200,3 +208,11 @@ def prepare_tokens(tokenizer, text):
     text_tokens[1, : len(tokens)] = tokens
     text_tokens = torch.tensor(text_tokens, dtype=torch.long).cuda()
     return text_tokens
+
+
+def post_process(img_tensors):
+    for t in img_tensors:
+        img = Image.fromarray(t.numpy())
+        buffer = io.BytesIO()
+        img.save(buffer, format='PNG')
+        yield buffer.getvalue()

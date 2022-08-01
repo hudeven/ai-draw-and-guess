@@ -4,7 +4,6 @@ import logging
 import requests
 import os
 
-from PIL import Image
 from collections import defaultdict
 from difflib import SequenceMatcher
 from flask import Flask, render_template, request
@@ -12,22 +11,10 @@ from flask_socketio import SocketIO, join_room
 import random
 
 
-#######################################################################
-#                   Build tokenizer and model                         #
-#######################################################################
+# imports for local model. it's not needed if use torchserve
+import torch
+from modeling.models.dalle.dalle import MinDalle, get_tokenizer, prepare_tokens, post_process
 
-
-# import torch
-# from modeling.models.dalle.dalle import MinDalle, get_tokenizer, prepare_tokens
-# from PIL import Image
-
-
-# root_dir = "modeling/pretrained"
-# is_mega = False
-
-# torch.manual_seed(42)
-# tokenizer = get_tokenizer(os.path.join(root_dir, f"dalle_{'mega' if is_mega else 'mini'}"))
-# model = MinDalle(is_mega=False, root_dir="modeling/pretrained")
 
 
 #######################################################################
@@ -185,11 +172,36 @@ def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     input_text = game_sentences_map[json["game_id"]][0] # assume first sentence is input
     model_name = json["model_name"]
 
-    url = f"http://localhost:8080/predictions/{model_name}" # for dalle_image_mini
-    response = requests.post(url, data=input_text)
+    if model_name == "dalle_mini_local":
+        global model
+        global tokenizer
+        
+        if model is None or tokenizer is None:
+            model, tokenizer = build_model_and_tokenizer()
+        
+        logger.info(f'start tokenization, model: {model_name}')
+        tokens = prepare_tokens(tokenizer, input_text)
+        logger.info(f'start prediction, tokens: {tokens}')
+        images = model(
+            tokens,
+            grid_size=1,
+            temperature=1,
+            top_k=32,
+            supercondition_factor=16.0,
+            progressive_outputs=True,
+            is_seamless= False,
+            is_verbose= True,
+        )
+        images = post_process(images)
+    else:
+        url = f"http://localhost:8080/predictions/{model_name}" # for dalle_image_mini
+        # torchserve output is already post processed 
+        images = [requests.post(url, data=input_text).content]
+    
+    for image in images:
+        img = get_encoded_img(img=image)
+        socketio.emit('ai-returns-image-event', img, callback=message_received, to=game_id)
 
-    img = get_encoded_img(response.content)
-    socketio.emit('ai-returns-image-event', img, callback=message_received, to=game_id)
 
 
 @socketio.on('guesser-submit-event')
@@ -296,9 +308,33 @@ def is_round_end(game_id):
     num_guesser = len(game_players_map[game_id]) - 1
     return num_guesser_sentences == num_guesser
 
+
 def get_encoded_img(img):
     encoded_img = base64.encodebytes(img).decode('ascii')
     return encoded_img
+
+
+#######################################################################
+#                   Build tokenizer and model                         #
+#######################################################################
+
+model = None
+tokenizer = None
+
+
+def build_model_and_tokenizer():
+    logger.info(f'start build_model_and_tokenizer...')
+        
+    global model
+    global tokenizer
+    
+    is_mega = False
+    root_dir = "modeling/pretrained"
+
+    torch.manual_seed(42)
+    tokenizer = get_tokenizer(os.path.join(root_dir, f"dalle_{'mega' if is_mega else 'mini'}"))
+    model = MinDalle(is_mega=is_mega, root_dir="modeling/pretrained", is_reusable=True)
+    return model, tokenizer
 
 
 if __name__ == '__main__':
