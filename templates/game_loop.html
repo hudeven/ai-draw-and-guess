@@ -81,7 +81,7 @@
           })
       }
 
-      $('#sentence').val('').focus()
+      $('#input_sentence').val('').focus()
     })
 
     socket.on('drawer-submit-event-response', function(msg) {
@@ -99,7 +99,7 @@
     })
 
     socket.on('ai-returns-image-event', function(data) {
-        $('#image_display').html("<div><img width='600' height='400' src='data:image/png;base64, " + data + "'/></div>")
+        $('#image_display').html("<img width='600' height='400' src='data:image/png;base64, " + data + "'/>")
 
         var drawer_name = $('#drawer_name').text()
         if (drawer_name == user_name) {
@@ -113,17 +113,17 @@
     socket.on('guesser-submit-event-response', function(msg) {
         console.log(msg)
         $('#log_display').append(
-            `<div>Guesser <b>${msg.user_name}</b>: ${msg.sentence} &emsp; (score <span style="color: blue">${msg.score}</span>)</div>`
+            `<div>Guesser <b>${msg.user_name}</b>: ${msg.sentence} &emsp; (score <b style="color: blue">${msg.score}</b>)</div>`
         )
 
         if (msg.is_round_end) {
             if (msg.is_drawer_win) {
                 $('#log_display').append(
-                    `<div>Drawer <b>${msg.drawer_name}</b>: I got score <span style="color: blue">${msg.drawer_score}</span> as no one guessed my sentence: <b>${msg.sentence}</b></div>`
+                    `<div>Drawer <b>${msg.drawer_name}</b>: I got score <b style="color: blue">${msg.drawer_score}</b> as no one guessed my sentence: <b style="color: blue">${msg.sentence}</b></div>`
                 )
             } else {
                 $('#log_display').append(
-                    `<div>Drawer <b>${msg.drawer_name}</b>: I got score <span style="color: blue">${msg.drawer_score}</span> as you guessed my sentence: <b>${msg.sentence}</b></div>`
+                    `<div>Drawer <b>${msg.drawer_name}</b>: I got score <b style="color: blue">${msg.drawer_score}</b> as you guessed my sentence: <b style="color: blue">${msg.sentence}</b></div>`
                 )
             }
             $('#log_display').append(`<div style="color:red;">Round ${msg.round_id} ended!</div><br>`)
