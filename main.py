@@ -175,12 +175,13 @@ def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     if model_name == "dalle_mini_local":
         global model
         global tokenizer
+        global device
         
         if model is None or tokenizer is None:
             model, tokenizer = build_model_and_tokenizer()
         
         logger.info(f'start tokenization, model: {model_name}')
-        tokens = prepare_tokens(tokenizer, input_text)
+        tokens = prepare_tokens(tokenizer, input_text, device=device)
         logger.info(f'start prediction, tokens: {tokens}')
         images = model(
             tokens,
@@ -320,6 +321,7 @@ def get_encoded_img(img):
 
 model = None
 tokenizer = None
+device = "cuda:1"
 
 
 def build_model_and_tokenizer():
@@ -327,13 +329,14 @@ def build_model_and_tokenizer():
         
     global model
     global tokenizer
+    global device
     
     is_mega = False
     root_dir = "modeling/pretrained"
 
     torch.manual_seed(42)
     tokenizer = get_tokenizer(os.path.join(root_dir, f"dalle_{'mega' if is_mega else 'mini'}"))
-    model = MinDalle(is_mega=is_mega, root_dir="modeling/pretrained", is_reusable=True)
+    model = MinDalle(is_mega=is_mega, root_dir="modeling/pretrained", is_reusable=True, device=device)
     return model, tokenizer
 
 

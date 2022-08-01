@@ -22,10 +22,9 @@ torch.backends.cudnn.allow_tf32 = True
 
 
 class MinDalle(nn.Module):
-    def __init__(self, root_dir="../pretrained", is_mega=True, is_reusable: bool = True):
+    def __init__(self, root_dir="../pretrained", is_mega=True, is_reusable: bool = True, device=None):
         super().__init__()
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.device = device
+        self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
         self.is_reusable = is_reusable
 
         root_dir = os.path.join(root_dir, f"dalle_{'mega' if is_mega else 'mini'}")
@@ -198,7 +197,8 @@ def get_tokenizer(root_dir):
     return TextTokenizer(vocab, merges)
 
 
-def prepare_tokens(tokenizer, text):
+def prepare_tokens(tokenizer, text, device=None):
+    device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
     tokens = tokenizer.tokenize(text)
     if len(tokens) > 64:
         tokens = tokens[:64]
@@ -206,7 +206,7 @@ def prepare_tokens(tokenizer, text):
     text_tokens = numpy.ones((2, 64), dtype=numpy.int32)
     text_tokens[0, :2] = [tokens[0], tokens[-1]]
     text_tokens[1, : len(tokens)] = tokens
-    text_tokens = torch.tensor(text_tokens, dtype=torch.long).cuda()
+    text_tokens = torch.tensor(text_tokens, dtype=torch.long, device=device)
     return text_tokens
 
 
