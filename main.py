@@ -8,7 +8,7 @@ from PIL import Image
 from collections import defaultdict
 from difflib import SequenceMatcher
 from flask import Flask, render_template, request
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, join_room
 import random
 
 
@@ -36,6 +36,7 @@ import random
 
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'secret!'
 logger = app.logger
 logger.setLevel(logging.DEBUG)
 socketio = SocketIO(app)
@@ -128,7 +129,7 @@ def handle_start_game_event(json, methods=['GET', 'POST']):
     round_id_map[game_id] = 0
     reset_leaderboards(game_id)
     json["round_id"] = 0
-    socketio.emit("start-game-event-response", json, callback=message_received)
+    socketio.emit("start-game-event-response", json, callback=message_received, to=game_id)
 
 
 @socketio.on('join-game-event')
@@ -136,6 +137,11 @@ def handle_join_game_event(json, methods=['GET', 'POST']):
     logger.info('received join-game-event: ' + str(json))
     game_id = json["game_id"]
     user_name = json["user_name"]
+    
+    # each user joins a room and related events will broadcast to the room
+    join_room(game_id)
+    logger.info(f"User {user_name} joined room {game_id}")
+    
     if not game_id:
         logger.error(f"bad game id: {game_id}")
         return
@@ -148,15 +154,21 @@ def handle_join_game_event(json, methods=['GET', 'POST']):
     else:
         logger.error(f"Duplicated user_name: {user_name} !")
     logger.info(f"return players: {game_players_map[game_id]}")
-    socketio.emit('join-game-event-response', {"players": game_players_map[game_id]}, callback=message_received)
+    socketio.emit(
+        'join-game-event-response', 
+        {"players": game_players_map[game_id]}, 
+        callback=message_received,
+        to=game_id,
+    )
 
 
 @socketio.on('drawer-submit-event')
 def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     logger.info('received drawer-submit-event: ' + str(json))
+    game_id = json["game_id"]
     game_sentences_map[json["game_id"]].clear()
     game_sentences_map[json["game_id"]].append(json["sentence"])
-    socketio.emit('drawer-submit-event-response', json, callback=message_received)
+    socketio.emit('drawer-submit-event-response', json, callback=message_received, to=game_id)
 
     # TODO: cache (draw's sentence, output image) for faster demo
     input_text = game_sentences_map[json["game_id"]][0] # assume first sentence is input
@@ -166,7 +178,7 @@ def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     response = requests.post(url, data=input_text)
 
     img = get_encoded_img(response.content)
-    socketio.emit('ai-returns-image-event', img, callback=message_received)
+    socketio.emit('ai-returns-image-event', img, callback=message_received, to=game_id)
 
 
 @socketio.on('guesser-submit-event')
@@ -199,7 +211,7 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
     json["game_leaderboard"] = game_leaderboard_sorted
     json["round_leaderboard"] = round_leaderboard_sorted
 
-    socketio.emit('guesser-submit-event-response', json, callback=message_received)
+    socketio.emit('guesser-submit-event-response', json, callback=message_received, to=game_id)
 
     if round_end:
         # clean up context for previous round
@@ -209,7 +221,7 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
         round_id_map[game_id] += 1
         drawer_name = select_drawer(game_id, round_id=round_id_map[game_id])
         payload = {"game_id": game_id, "round_id": round_id_map[game_id], "drawer_name": drawer_name}
-        socketio.emit("start-new-round-event", payload, callback=message_received)
+        socketio.emit("start-new-round-event", payload, callback=message_received, to=game_id)
 
 
 #######################################################################
