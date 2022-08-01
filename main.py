@@ -7,6 +7,7 @@ import os
 from collections import defaultdict
 from difflib import SequenceMatcher
 from flask import Flask, render_template, request
+from flask_caching import Cache
 from flask_socketio import SocketIO, join_room
 import random
 
@@ -21,12 +22,19 @@ from modeling.models.dalle.dalle import MinDalle, get_tokenizer, prepare_tokens,
 #                         service endpoints                            #
 #######################################################################
 
-
+config = {
+    "DEBUG": True,          # some Flask specific configs
+    "CACHE_TYPE": "SimpleCache",  # Flask-Caching related configs
+    "CACHE_DEFAULT_TIMEOUT": 3600,
+    "SECRET_KEY": 'secret!',
+}
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret!'
+app.config.from_mapping(config)
 logger = app.logger
 logger.setLevel(logging.DEBUG)
+
 socketio = SocketIO(app)
+cache = Cache(app)
 
 game_players_map = defaultdict(list)  # {game_id: list of players' user_name}
 game_drawers_shuffled_map = defaultdict(list)  # {game_id: list of shuffled players' user_name}
@@ -172,36 +180,22 @@ def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     input_text = game_sentences_map[json["game_id"]][0] # assume first sentence is input
     model_name = json["model_name"]
 
-    if model_name == "dalle_mini_local":
-        global model
-        global tokenizer
-        global device
-        
-        if model is None or tokenizer is None:
-            model, tokenizer = build_model_and_tokenizer()
-        
-        logger.info(f'start tokenization, model: {model_name}')
-        tokens = prepare_tokens(tokenizer, input_text, device=device)
-        logger.info(f'start prediction, tokens: {tokens}')
-        images = model(
-            tokens,
-            grid_size=1,
-            temperature=1,
-            top_k=32,
-            supercondition_factor=16.0,
-            progressive_outputs=True,
-            is_seamless= False,
-            is_verbose= True,
-        )
-        images = post_process(images)
-    else:
-        url = f"http://localhost:8080/predictions/{model_name}" # for dalle_image_mini
-        # torchserve output is already post processed 
-        images = [requests.post(url, data=input_text).content]
+    cache_key = f"{model_name}_{input_text}"
+    images = cache.get(cache_key)
+    
+    if images is None:
+        if model_name == "dalle_mini_local":
+            images = predict_from_local_model(model_name, input_text)
+        else:
+            images = predict_from_torchserve(model_name, input_text)
     
     for image in images:
         img = get_encoded_img(img=image)
         socketio.emit('ai-returns-image-event', img, callback=message_received, to=game_id)
+    
+    # cache the result for fast demo or debugging
+    if not cache.get(cache_key):
+        cache.set(cache_key, [image])
 
 
 
@@ -251,6 +245,38 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
 #######################################################################
 #                         helper functions                            #
 #######################################################################
+
+
+def predict_from_torchserve(model_name, input_text):
+    logger.info(f'start tokenization, model: {model_name}, input_text: {input_text}')
+    url = f"http://localhost:8080/predictions/{model_name}" # for dalle_image_mini
+    # torchserve output is already post processed 
+    images = [requests.post(url, data=input_text).content]
+    return images
+
+
+def predict_from_local_model(model_name, input_text):
+    global model
+    global tokenizer
+    global device
+
+    if model is None or tokenizer is None:
+        model, tokenizer = build_model_and_tokenizer()
+
+    logger.info(f'start tokenization, model: {model_name}, input_text: {input_text}')
+    tokens = prepare_tokens(tokenizer, input_text, device=device)
+    logger.info(f'start prediction, tokens: {tokens}')
+    images = model(
+        tokens,
+        grid_size=1,
+        temperature=1,
+        top_k=32,
+        supercondition_factor=16.0,
+        progressive_outputs=True,
+        is_seamless= False,
+        is_verbose= True,
+    )
+    return post_process(images)
 
 
 def calculate_score(correct_sentence, guess_sentence):
@@ -341,4 +367,4 @@ def build_model_and_tokenizer():
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0', port=9000)
+    socketio.run(app, host='0.0.0.0', port=9000)
