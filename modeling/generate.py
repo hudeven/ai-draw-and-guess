@@ -46,6 +46,10 @@ if __name__ == "__main__":
         )
         model.eval()
 
+    image_folder = os.path.dirname(args.image_path)
+    if not os.path.exists(image_folder):
+        os.mkdir(image_folder)
+
     start = time.monotonic()
     for i, image in enumerate(model(tokens, args.grid_size, top_k=args.top_k, progressive_outputs=not args.ts)):
          Image.fromarray(image.numpy()).save(args.image_path + "_" + str(i) + ".png") 
