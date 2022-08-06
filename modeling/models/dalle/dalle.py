@@ -9,6 +9,7 @@ import json
 from PIL import Image
 from typing import List
 from torch import Tensor
+from torch.profiler import record_function
 from .bart_encoder import DalleBartEncoder
 from .bart_decoder import DalleBartDecoder
 from .vqgan_detokenizer import VQGanDetokenizer
@@ -112,24 +113,26 @@ class MinDalle(nn.Module):
             device=self.device,
         )
         
-        if progressive_outputs:
-            return self.get_progressive_output(
-                image_tokens,
-                settings,
-                attention_mask,
-                encoder_state,
-                attention_state,
-                token_indices,
-            )
-        
-        return self.get_final_output(
-                image_tokens,
-                settings,
-                attention_mask,
-                encoder_state,
-                attention_state,
-                token_indices,
-            )
+        with record_function("decoding"):
+            if progressive_outputs:
+                output = self.get_progressive_output(
+                    image_tokens,
+                    settings,
+                    attention_mask,
+                    encoder_state,
+                    attention_state,
+                    token_indices,
+                )
+            else:
+                output = self.get_final_output(
+                    image_tokens,
+                    settings,
+                    attention_mask,
+                    encoder_state,
+                    attention_state,
+                    token_indices,
+                )
+        return output
 
     
     def get_final_output(self, image_tokens, settings, attention_mask, encoder_state, attention_state, token_indices) -> List[Tensor]:
