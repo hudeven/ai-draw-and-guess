@@ -37,7 +37,7 @@
 <div id="image_display"></div>
 
 <br>
-<div id="log_display" style="width:600px;height:200px;line-height:1em;overflow:auto;padding:5px;border:4px double"></div>
+<div id="log_display" style="width:600px;height:300px;line-height:1em;overflow:auto;padding:5px;border:4px double"></div>
     
 <font size="6">
     <span id="timer_display" style="color: red"></span>
@@ -63,7 +63,7 @@
 <div id="control_panel" style="width:600px;height:100px;line-height:1em;overflow:auto;padding:5px;border:4px double;background-color:#E8E8E8">
     <h2>Control Panel</h2>
     <div>
-        <label for="model_name">Choose a model:</label>
+        <label for="model_name">Choose a model </label>
         <select id="model_name">
         <option value="dalle_mega">DALL·E mega (torchserve)</option>
         <option value="dalle_mini">DALL·E mini (torchserve)</option>
@@ -72,7 +72,7 @@
     </div>
     <div>
         <form id="timeout_form" action="" method="POST">
-            <label for="timeout_sec">Set timeout</label>
+            <label for="timeout_sec">Set timeout </label>
             <input type="text" id="timeout_sec" placeholder="Enter seconds" style="width: 100px"/>
             <input type="submit"/>
         </form>
@@ -139,7 +139,7 @@
         var is_send = user_name == drawer_name
         var round_id = $("#round_id").text()
         timer = activate_count_down_timer(msg.timeout, is_send, game_id, round_id)
-        $('#timeout_sec').html(msg.timeout)
+        $('#timeout_sec').val(msg.timeout)
     })
 
     socket.on('ai-returns-image-event', function(data) {
@@ -202,7 +202,7 @@
         }
 
         // show round_leaderboard
-        $('#log_display').append(`<div><b>Leaderboard for Round <b>${msg.round_id - 1}</b></div>`)
+        $('#log_display').append(`<br><div><b>Leaderboard for Round <b>${msg.round_id - 1}</b></div>`)
         $('#log_display').append(`<div>Player &emsp;&emsp;&emsp; Score</div>`)
         for (let i = 0; i < msg.round_leaderboard.length; i++) {
             $('#log_display').append(
