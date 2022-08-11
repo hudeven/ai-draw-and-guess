@@ -216,7 +216,8 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
     guess_sentence = json["sentence"]
     game_guesser_sentence_map[game_id][user_name] = guess_sentence
     correct_sentence = game_sentences_map[game_id][0]
-    score = calculate_score(correct_sentence, guess_sentence)
+    score, match_text = calculate_score(correct_sentence, guess_sentence)
+    json["sentence"] = match_text
 
     update_leaderboards(game_id, user_name, score)
     
@@ -330,11 +331,23 @@ def predict_from_local_model(model_name, input_text):
     return post_process(images)
 
 
+def get_diff(seqm):
+    output = []
+    for opcode, a0, a1, b0, b1 in seqm.get_opcodes():
+        if opcode == 'equal':
+            output.append("<b style='color: green'>" + seqm.a[a0:a1] + "</b>")
+        else:
+            output.append(seqm.b[b0:b1])
+    return ''.join(output)
+
+
 def calculate_score(correct_sentence, guess_sentence):
     # TODO: call text-similarity model to calculate the score
-    score = SequenceMatcher(None, correct_sentence, guess_sentence).ratio()
+    sm = SequenceMatcher(None, correct_sentence, guess_sentence)
+    score = sm.ratio()
     score = round(score * MAX_SCORE, 1)
-    return  score
+
+    return  score, get_diff(sm)
 
 
 def get_drawer_score(game_id):
@@ -363,7 +376,7 @@ def reset_round_leaderboard(game_id):
 def update_leaderboards(game_id, user_name, score):
     # only update leaderboard for the higher score or the first score
     if score >= round_leaderboard[game_id][user_name]:
-        game_leaderboard[game_id][user_name] += round(
+        game_leaderboard[game_id][user_name] = round(
             game_leaderboard[game_id][user_name] - round_leaderboard[game_id][user_name] + score,
             1,
         )
