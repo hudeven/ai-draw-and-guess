@@ -226,6 +226,10 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
 
     socketio.emit('guesser-submit-event-response', json, callback=message_received, to=game_id)
 
+    if abs(score - MAX_SCORE) <= 0.01:
+        # Guessers win as the guess score is close enough. start a new round
+        start_new_round(game_id)
+
 
 def start_new_round(game_id):
     drawer_name = get_drawer(game_id, round_id_map[game_id])
