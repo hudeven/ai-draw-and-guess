@@ -35,10 +35,12 @@
 </p>
 
 <div id="image_display"></div>
+
 <br>
+<div id="log_display" style="width:600px;height:200px;line-height:1em;overflow:auto;padding:5px;border:4px double"></div>
     
 <font size="6">
-    <span id="timer_display"></span>
+    <span id="timer_display" style="color: red"></span>
     <span id="guide_display">
         {% if user_name == drawer_name %}
             Your are the Drawer! Please enter a sentence...
@@ -46,14 +48,8 @@
             Drawer <b> {{ drawer_name }} </b> is typing a sentence...
         {% endif %}
     </span>
-    
 </font>
 
-<br>
-<div id="log_display" style="width:600px;height:200px;line-height:1em;overflow:auto;padding:5px;border:4px double"></div>
-    
-    
-<br>
 <form action="" method="POST">
     <input type="text" id="input_sentence" placeholder="Enter a sentence" style="width: 600px"/>
     <input type="submit"/>
@@ -78,6 +74,8 @@
     var game_id = $('#game_id').text()
     var user_name = $('#user_name').text()
     var drawer_name = $('#drawer_name').text()
+    var timer = null
+
     if (drawer_name != user_name) {
         $("#input_sentence").prop("disabled", true)
     }
@@ -92,27 +90,29 @@
       // as #drawer_name might be updated, we need to get the lastest value
       var drawer_name = $('#drawer_name').text()
       if (drawer_name == user_name) {
-          var model_name = $('#model_name').val()
-          console.log(`selected model: ${model_name}`)
-          socket.emit('drawer-submit-event', {
-              game_id: game_id,
-              drawer_name: user_name,
-              sentence: sentence,
-              model_name: model_name,
-          })
+            // display and hide timer
+            if (timer != null) {
+                clearInterval(timer)
+                $("#timer_display").empty()
+            }
+            var model_name = $('#model_name').val()
+            console.log(`selected model: ${model_name}`)
+            socket.emit('drawer-submit-event', {
+                game_id: game_id,
+                drawer_name: user_name,
+                sentence: sentence,
+                model_name: model_name,
+            })
       } else {
-         socket.emit('guesser-submit-event', {
-              game_id: game_id,
-              user_name: user_name,
-              sentence: sentence,
-          })
+            socket.emit('guesser-submit-event', {
+                game_id: game_id,
+                user_name: user_name,
+                sentence: sentence,
+            })
       }
 
       $('#input_sentence').val('').focus()
     })
-
-
-    var timer
 
     socket.on('drawer-submit-event-response', function(msg) {
         console.log(msg)
