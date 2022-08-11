@@ -10,7 +10,7 @@ import requests
 
 # imports for local model. it's not needed if use torchserve
 import torch
-from flask import Flask, render_template, request
+from flask import Flask, make_response, render_template, request
 from flask_caching import Cache
 from flask_socketio import SocketIO, join_room
 
@@ -87,8 +87,9 @@ def create_game(game_id, user_name):
 @app.route('/join_game/<game_id>/<user_name>', methods=['GET'])
 def join_game(game_id, user_name):
     if not game_creator_map.get(game_id, None):
-        logger.error(f"Invalid game_id: {game_id}")
-        return
+        error_msg = f"game_id: {game_id} doesn't exist!"
+        logger.error(error_msg)
+        return make_response(error_msg, 200)
     creator = game_creator_map[game_id]
     return render_template(
         'waiting_players.html',
