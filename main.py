@@ -52,14 +52,13 @@ game_leaderboard = defaultdict(dict)
 round_leaderboard = defaultdict(dict)
 game_timeout = defaultdict(lambda: DEFAULT_TIMEOUT)
 
-game_rules = """
+game_rules = f"""
     1. We have N players join the game. N >= 2.
     2. A drawer will be randomly selected, the others become guessers.
-    3. The drawer enters a sentence to start a round.
-    4. AI will generate an image from the sentence and show it to all guessers.
-    5. Each guesser enters a guessing sentence according to the image.
-    6. Show a leaderboard with each guesser’s score(similarity to the correct sentence).
-    7. Round ends. Start a new round and goto 2.
+    3. The drawer enters a sentence to start a round. 
+    4. AI will generate an image from the sentence and show the image to all guessers.
+    5. Guessers can enter one or more guessing sentences in {DEFAULT_TIMEOUT} seconds. Each will get a score. Only the highest score counts.
+    6. When time's up or any guesser submits the correct sentence, round ends and show leaderboard. Start a new round and goto 2.
 """
 
 @app.route('/')
@@ -173,7 +172,6 @@ def handle_join_room_event(json):
     # each user joins a room and related events will broadcast to the room
     join_room(game_id)
     logger.info(f"User {user_name} joined room {game_id}")
-    
 
 
 @socketio.on('drawer-submit-event')
