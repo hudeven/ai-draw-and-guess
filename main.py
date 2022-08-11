@@ -184,6 +184,8 @@ def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     game_sentences_map[json["game_id"]].append(json["sentence"])
     json["masked_sentence"] = get_masked_sentence(json["sentence"])
     json["timeout"] = game_timeout[game_id]
+
+    del json["sentence"]  # hide correct sentence from guessers
     socketio.emit('drawer-submit-event-response', json, callback=message_received, to=game_id)
 
     # TODO: cache (draw's sentence, output image) for faster demo
