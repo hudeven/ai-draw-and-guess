@@ -4,6 +4,24 @@
     <title>AI Draw and Guess</title>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.min.js"></script>
+
+    <script>
+        function activate_count_down_timer(seconds, is_send, game_id) {
+            var time_left = seconds
+            var timer = setInterval(function() {
+                if (time_left <= 0) {
+                    $("#timer_display").empty()
+                    if (is_send) {
+                        // guessers run out of time, ask server to start a new round
+                        socket.emit('timer-finish-event', {game_id: game_id})
+                    }
+                    clearInterval(timer)
+                }
+                $("#timer_display").html(time_left)
+                time_left -= 1
+            }, 1000)
+        }
+    </script>
 </head>
 
 <body>
@@ -19,13 +37,15 @@
 <br>
     
 <font size="6">
-    <div id="guide_display">
+    <span id="timer_display"></span>
+    <span id="guide_display">
         {% if user_name == drawer_name %}
             Your are the Drawer! Please enter a sentence...
         {% else %}
             Drawer <b> {{ drawer_name }} </b> is typing a sentence...
         {% endif %}
-    </div>
+    </span>
+    
 </font>
 
 <br>
@@ -101,6 +121,10 @@
             `<div>Drawer <b>${msg.drawer_name}</b>: I submitted sentence: <b style="color: green">${msg.masked_sentence}</b></div>`
         )
         $('#log_display').scrollTop($('#log_display')[0].scrollHeight)
+
+        // only drawer will send "timer-finish-event" to server. otherwise, multiple events from all players will be sent
+        is_send = user_name == drawer_name
+        activate_count_down_timer(30, is_send, game_id)
 
     })
 

@@ -225,10 +225,6 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
 
     socketio.emit('guesser-submit-event-response', json, callback=message_received, to=game_id)
 
-    if is_round_end(game_id):
-        # at the end of round, add score for the drawer
-        start_new_round(game_id)
-
 
 def start_new_round(game_id):
     drawer_name = get_drawer(game_id, round_id_map[game_id])
@@ -255,6 +251,11 @@ def start_new_round(game_id):
     # payload = {"game_id": game_id, "round_id": round_id_map[game_id], "drawer_name": drawer_name}
     socketio.emit("start-new-round-event", json, callback=message_received, to=game_id)
 
+
+@socketio.on('timer-finish-event')
+def handle_timer_finish_event(json, methods=['GET', 'POST']):
+    logger.info('received timer-finish-event: ' + str(json))
+    start_new_round(json["game_id"])
 
 
 #######################################################################
