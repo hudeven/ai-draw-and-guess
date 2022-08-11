@@ -363,7 +363,10 @@ def reset_round_leaderboard(game_id):
 def update_leaderboards(game_id, user_name, score):
     # only update leaderboard for the higher score or the first score
     if score >= round_leaderboard[game_id][user_name]:
-        game_leaderboard[game_id][user_name] += score - round_leaderboard[game_id][user_name]
+        game_leaderboard[game_id][user_name] += round(
+            game_leaderboard[game_id][user_name] - round_leaderboard[game_id][user_name] + score,
+            1,
+        )
         round_leaderboard[game_id][user_name] = score
 
 
