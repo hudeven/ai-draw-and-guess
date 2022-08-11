@@ -48,6 +48,8 @@ game_guesser_sentence_map = defaultdict(dict)  # {game_id: {guesser_name: senten
 game_leaderboard = defaultdict(dict)
 round_leaderboard = defaultdict(dict)
 
+MAX_SCORE = 10
+
 game_rules = """
     1. We have N players join the game. N >= 2.
     2. A drawer will be randomly selected, the others become guessers.
@@ -203,7 +205,6 @@ def handle_drawer_submit_event(json, methods=['GET', 'POST']):
         cache.set(cache_key, [image])
 
 
-
 @socketio.on('guesser-submit-event')
 def handle_guesser_submit_event(json, methods=['GET', 'POST']):
     logger.info('received guesser-submit-event: ' + str(json))
@@ -234,7 +235,7 @@ def start_new_round(game_id):
     json["drawer_name"] = drawer_name
     json["drawer_score"] = drawer_score
     json["correct_sentence"] = game_sentences_map[game_id][0]
-    json["is_drawer_win"] = round_leaderboard[game_id][drawer_name] == 10
+    json["is_drawer_win"] = round_leaderboard[game_id][drawer_name] == MAX_SCORE
     game_leaderboard_sorted = sorted(game_leaderboard[game_id].items(), key=lambda x: x[1], reverse=True)
     round_leaderboard_sorted = sorted(round_leaderboard[game_id].items(), key=lambda x: x[1], reverse=True)
     json["game_leaderboard"] = game_leaderboard_sorted
@@ -248,7 +249,6 @@ def start_new_round(game_id):
     round_id_map[game_id] += 1
     json["round_id"] = round_id_map[game_id]
     json["new_drawer_name"] = select_drawer(game_id, round_id=round_id_map[game_id])
-    # payload = {"game_id": game_id, "round_id": round_id_map[game_id], "drawer_name": drawer_name}
     socketio.emit("start-new-round-event", json, callback=message_received, to=game_id)
 
 
@@ -298,19 +298,19 @@ def predict_from_local_model(model_name, input_text):
 def calculate_score(correct_sentence, guess_sentence):
     # TODO: call text-similarity model to calculate the score
     score = SequenceMatcher(None, correct_sentence, guess_sentence).ratio()
-    score = round(score * 10, 1)
+    score = round(score * MAX_SCORE, 1)
     return  score
 
 
 def get_drawer_score(game_id):
     """
-    If no guessers get 10, the drawer will get 10. Otherwise, drawer gets 0
+    If no guessers get MAX_SCORE, the drawer will get MAX_SCORE. Otherwise, drawer gets 0
     It incentivizes the drawer to enter a harder sentence to fight against the guessers
     """
-    for user_name, score in round_leaderboard[game_id].items():
-        if score >= 10:
+    for score in round_leaderboard[game_id].values():
+        if score >= MAX_SCORE:
             return 0
-    return 10
+    return MAX_SCORE
 
 
 def reset_leaderboards(game_id):
