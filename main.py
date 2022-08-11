@@ -214,19 +214,7 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
     score = calculate_score(correct_sentence, guess_sentence)
 
     update_leaderboards(game_id, user_name, score)
-    round_end = is_round_end(game_id)
-    json["is_round_end"] = round_end
-    if round_end:
-        # at the end of round, add score for the drawer
-        drawer_name = get_drawer(game_id, round_id_map[game_id])
-        drawer_score = get_drawer_score(game_id)
-        update_leaderboards(game_id, drawer_name, drawer_score)
-        json["round_id"] = round_id_map[game_id]
-        json["drawer_name"] = drawer_name
-        json["drawer_score"] = drawer_score
-        json["is_drawer_win"] = round_leaderboard[game_id][drawer_name] == 10
-        json["correct_sentence"] = correct_sentence
-
+    
     game_leaderboard_sorted = sorted(game_leaderboard[game_id].items(), key=lambda x: x[1], reverse=True)
     round_leaderboard_sorted = sorted(round_leaderboard[game_id].items(), key=lambda x: x[1], reverse=True)
 
@@ -236,15 +224,36 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
 
     socketio.emit('guesser-submit-event-response', json, callback=message_received, to=game_id)
 
-    if round_end:
-        # clean up context for previous round
-        game_guesser_sentence_map[game_id] = {}
+    if is_round_end(game_id):
+        # at the end of round, add score for the drawer
+        start_new_round(game_id)
 
-        # setup context for the new round
-        round_id_map[game_id] += 1
-        drawer_name = select_drawer(game_id, round_id=round_id_map[game_id])
-        payload = {"game_id": game_id, "round_id": round_id_map[game_id], "drawer_name": drawer_name}
-        socketio.emit("start-new-round-event", payload, callback=message_received, to=game_id)
+
+def start_new_round(game_id):
+    drawer_name = get_drawer(game_id, round_id_map[game_id])
+    drawer_score = get_drawer_score(game_id)
+    update_leaderboards(game_id, drawer_name, drawer_score)
+    json = {}
+    json["drawer_name"] = drawer_name
+    json["drawer_score"] = drawer_score
+    json["correct_sentence"] = game_sentences_map[game_id][0]
+    json["is_drawer_win"] = round_leaderboard[game_id][drawer_name] == 10
+    game_leaderboard_sorted = sorted(game_leaderboard[game_id].items(), key=lambda x: x[1], reverse=True)
+    round_leaderboard_sorted = sorted(round_leaderboard[game_id].items(), key=lambda x: x[1], reverse=True)
+    json["game_leaderboard"] = game_leaderboard_sorted
+    json["round_leaderboard"] = round_leaderboard_sorted
+    reset_round_leaderboard(game_id)
+    
+    # clean up context for previous round
+    game_guesser_sentence_map[game_id] = {}
+
+    # setup context for the new round
+    round_id_map[game_id] += 1
+    json["round_id"] = round_id_map[game_id]
+    json["new_drawer_name"] = select_drawer(game_id, round_id=round_id_map[game_id])
+    # payload = {"game_id": game_id, "round_id": round_id_map[game_id], "drawer_name": drawer_name}
+    socketio.emit("start-new-round-event", json, callback=message_received, to=game_id)
+
 
 
 #######################################################################
@@ -303,9 +312,14 @@ def get_drawer_score(game_id):
 
 
 def reset_leaderboards(game_id):
-    players = game_players_map[game_id]
-    for player in players:
+    reset_round_leaderboard(game_id)
+    
+    for player in game_players_map[game_id]:
         game_leaderboard[game_id][player] = 0
+
+
+def reset_round_leaderboard(game_id):    
+    for player in game_players_map[game_id]:
         round_leaderboard[game_id][player] = 0
 
 

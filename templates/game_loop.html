@@ -122,18 +122,7 @@
             `<div>Guesser <b>${msg.user_name}</b>: ${msg.sentence} &emsp; (score <b style="color: blue">${msg.score}</b>)</div>`
         )
 
-        if (msg.is_round_end) {
-            if (msg.is_drawer_win) {
-                $('#log_display').append(
-                    `<div>Drawer <b>${msg.drawer_name}</b>: I got score <b style="color: blue">${msg.drawer_score}</b> as no one guessed my sentence: <b style="color: blue">${msg.correct_sentence}</b></div>`
-                )
-            } else {
-                $('#log_display').append(
-                    `<div>Drawer <b>${msg.drawer_name}</b>: I got score <b style="color: blue">${msg.drawer_score}</b> as you guessed my sentence: <b style="color: blue">${msg.correct_sentence}</b></div>`
-                )
-            }
-            $('#log_display').append(`<div style="color:red;">Round ${msg.round_id} ended!</div><br>`)
-        }
+        
         $('#log_display').scrollTop($('#log_display')[0].scrollHeight)
         
         $('#game_leaderboard').empty()
@@ -148,16 +137,37 @@
     // Refresh page to the next round
     socket.on('start-new-round-event', function(msg) {
         $('#round_id').text(msg.round_id)
-        $('#drawer_name').text(msg.drawer_name)
+        $('#drawer_name').text(msg.new_drawer_name)
         
+        
+        if (msg.is_drawer_win) {
+            $('#log_display').append(
+                `<div>Drawer <b>${msg.drawer_name}</b>: I got score <b style="color: blue">${msg.drawer_score}</b> as no one guessed my sentence: <b style="color: blue">${msg.correct_sentence}</b></div>`
+            )
+        } else {
+            $('#log_display').append(
+                `<div>Drawer <b>${msg.drawer_name}</b>: I got score <b style="color: blue">${msg.drawer_score}</b> as you guessed my sentence: <b style="color: blue">${msg.correct_sentence}</b></div>`
+            )
+        }
+        $('#log_display').append(`<div style="color:red;">Round ${msg.round_id - 1} ended!</div><br>`)
+        
+        $('#game_leaderboard').empty()
+        $('#game_leaderboard').append(`<div>Player &emsp;&emsp;&emsp; Score</div>`)
+        for (let i = 0; i < msg.game_leaderboard.length; i++) {
+            $('#game_leaderboard').append(
+                `<div>${msg.game_leaderboard[i][0]} &emsp;&emsp;&emsp;&emsp;&emsp; ${msg.game_leaderboard[i][1]}</div>`
+            )
+        }
+
+        // Start new round
         $('#log_display').append(`<div>Round ${msg.round_id} started!</div>`)
         $('#log_display').scrollTop($('#log_display')[0].scrollHeight)
         
-        if (msg.drawer_name != user_name) {
-            $("#input_sentence").prop("disabled", true)
-            $('#guide_display').html(`Drawer <b>${msg.drawer_name}</b> is typing a sentence...`)
-        } else {
+        if (msg.new_drawer_name == user_name) {
             $('#guide_display').html(`Your are the Drawer! Please enter a sentence...`)
+        } else {
+            $("#input_sentence").prop("disabled", true)
+            $('#guide_display').html(`Drawer <b>${msg.new_drawer_name}</b> is typing a sentence...`)
         }
     })
 
