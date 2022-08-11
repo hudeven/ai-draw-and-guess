@@ -223,10 +223,12 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
     json["score"] = score
     json["game_leaderboard"] = game_leaderboard_sorted
     json["round_leaderboard"] = round_leaderboard_sorted
+    
+    json["is_guesser_win"] = abs(score - MAX_SCORE) <= 0.01
 
     socketio.emit('guesser-submit-event-response', json, callback=message_received, to=game_id)
 
-    if abs(score - MAX_SCORE) <= 0.01:
+    if json["is_guesser_win"]:
         # Guessers win as the guess score is close enough. start a new round
         start_new_round(game_id)
 

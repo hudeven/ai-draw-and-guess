@@ -142,8 +142,13 @@
 
     socket.on('guesser-submit-event-response', function(msg) {
         console.log(msg)
+        var guess_sentence = msg.sentence
+        if (msg.is_guesser_win) {
+            // mark the correct guesser's sentence in green color
+            guess_sentence = `<b style="color: green">${guess_sentence}</b>`
+        }
         $('#log_display').append(
-            `<div>Guesser <b>${msg.user_name}</b>: ${msg.sentence} &emsp; (score <b style="color: blue">${msg.score}</b>)</div>`
+            `<div>Guesser <b>${msg.user_name}</b>: ${guess_sentence} &emsp; (score <b style="color: blue">${msg.score}</b>)</div>`
         )
 
         
@@ -163,18 +168,29 @@
         $('#round_id').text(msg.round_id)
         $('#drawer_name').text(msg.new_drawer_name)
         
-        
+        // show drawer's score and the correct sentence
         if (msg.is_drawer_win) {
             $('#log_display').append(
-                `<div>Drawer <b>${msg.drawer_name}</b>: I got score <b style="color: blue">${msg.drawer_score}</b> as no one guessed my sentence: <b style="color: blue">${msg.correct_sentence}</b></div>`
+                `<div>Drawer <b>${msg.drawer_name}</b>: I got score <b style="color: blue">${msg.drawer_score}</b> as no one guessed my sentence: <b style="color: green">${msg.correct_sentence}</b></div>`
             )
         } else {
             $('#log_display').append(
-                `<div>Drawer <b>${msg.drawer_name}</b>: I got score <b style="color: blue">${msg.drawer_score}</b> as you guessed my sentence: <b style="color: blue">${msg.correct_sentence}</b></div>`
+                `<div>Drawer <b>${msg.drawer_name}</b>: I got score <b style="color: blue">${msg.drawer_score}</b> as you guessed my sentence: <b style="color: green">${msg.correct_sentence}</b></div>`
             )
         }
-        $('#log_display').append(`<div style="color:red;">Round ${msg.round_id - 1} ended!</div><br>`)
+
+        // show round_leaderboard
+        $('#log_display').append(`<h5>Leaderboard for Round <b>${msg.round_id - 1}</h5>`)
+        $('#log_display').append(`<div>Player &emsp;&emsp;&emsp; Score</div>`)
+        for (let i = 0; i < msg.round_leaderboard.length; i++) {
+            $('#log_display').append(
+                `<div>${msg.round_leaderboard[i][0]} &emsp;&emsp;&emsp;&emsp;&emsp; ${msg.round_leaderboard[i][1]}</div>`
+            )
+        }
+
+        $('#log_display').append(`<div style="color:red;">------------------------------ Round <b>${msg.round_id - 1}</b> ended ------------------------------</div><br>`)
         
+        // refresh game_leaderboard
         $('#game_leaderboard').empty()
         $('#game_leaderboard').append(`<div>Player &emsp;&emsp;&emsp; Score</div>`)
         for (let i = 0; i < msg.game_leaderboard.length; i++) {
