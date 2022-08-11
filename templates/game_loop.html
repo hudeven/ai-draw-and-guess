@@ -6,20 +6,21 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.min.js"></script>
 
     <script>
-        function activate_count_down_timer(seconds, is_send, game_id) {
+        function activate_count_down_timer(seconds, is_send, game_id, round_id) {
             var time_left = seconds
             var timer = setInterval(function() {
                 if (time_left <= 0) {
                     $("#timer_display").empty()
                     if (is_send) {
                         // guessers run out of time, ask server to start a new round
-                        socket.emit('timer-finish-event', {game_id: game_id})
+                        socket.emit('timer-finish-event', {game_id: game_id, round_id: round_id})
                     }
                     clearInterval(timer)
                 }
                 $("#timer_display").html(time_left)
                 time_left -= 1
             }, 1000)
+            return timer
         }
     </script>
 </head>
@@ -110,6 +111,9 @@
       $('#input_sentence').val('').focus()
     })
 
+
+    var timer
+
     socket.on('drawer-submit-event-response', function(msg) {
         console.log(msg)
         $('#image_display').html('<img width="400" height="400" src="/static/loading_img.gif" alt="" />')
@@ -123,8 +127,9 @@
         $('#log_display').scrollTop($('#log_display')[0].scrollHeight)
 
         // only drawer will send "timer-finish-event" to server. otherwise, multiple events from all players will be sent
-        is_send = user_name == drawer_name
-        activate_count_down_timer(30, is_send, game_id)
+        var is_send = user_name == drawer_name
+        var round_id = $("#round_id").text()
+        timer = activate_count_down_timer(30, is_send, game_id, round_id)
 
     })
 
@@ -165,6 +170,11 @@
 
     // Refresh page to the next round
     socket.on('start-new-round-event', function(msg) {
+
+        // display and hide timer
+        clearInterval(timer)
+        $("#timer_display").empty()
+
         $('#round_id').text(msg.round_id)
         $('#drawer_name').text(msg.new_drawer_name)
         
@@ -180,7 +190,7 @@
         }
 
         // show round_leaderboard
-        $('#log_display').append(`<h5>Leaderboard for Round <b>${msg.round_id - 1}</h5>`)
+        $('#log_display').append(`<div><b>Leaderboard for Round <b>${msg.round_id - 1}</b></div>`)
         $('#log_display').append(`<div>Player &emsp;&emsp;&emsp; Score</div>`)
         for (let i = 0; i < msg.round_leaderboard.length; i++) {
             $('#log_display').append(
