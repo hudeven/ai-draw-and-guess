@@ -1,22 +1,25 @@
 import base64
 import io
 import logging
-import requests
 import os
-
+import random
 from collections import defaultdict
 from difflib import SequenceMatcher
-from flask import Flask, render_template, request
-from flask_caching import Cache
-from flask_socketio import SocketIO, join_room
-import random
 
+import requests
 
 # imports for local model. it's not needed if use torchserve
 import torch
-from modeling.models.dalle.dalle import MinDalle, get_tokenizer, prepare_tokens, post_process
+from flask import Flask, render_template, request
+from flask_caching import Cache
+from flask_socketio import SocketIO, join_room
 
-
+from modeling.models.dalle.dalle import (
+    MinDalle,
+    get_tokenizer,
+    post_process,
+    prepare_tokens,
+)
 
 #######################################################################
 #                         service endpoints                            #
@@ -306,8 +309,10 @@ def reset_leaderboards(game_id):
 
 
 def update_leaderboards(game_id, user_name, score):
-    round_leaderboard[game_id][user_name] = score
-    game_leaderboard[game_id][user_name] += score
+    # only update leaderboard for the higher score or the first score
+    if score >= round_leaderboard[game_id][user_name]:
+        game_leaderboard[game_id][user_name] += score - round_leaderboard[game_id][user_name]
+        round_leaderboard[game_id][user_name] = score
 
 
 def select_drawer(game_id, round_id):
