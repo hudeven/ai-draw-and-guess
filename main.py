@@ -25,6 +25,9 @@ from modeling.models.dalle.dalle import (
 #                         service endpoints                            #
 #######################################################################
 
+MAX_SCORE = 10
+DEFAULT_TIMEOUT = 60
+
 config = {
     "DEBUG": True,          # some Flask specific configs
     "CACHE_TYPE": "SimpleCache",  # Flask-Caching related configs
@@ -47,8 +50,7 @@ game_creator_map = dict()
 game_guesser_sentence_map = defaultdict(dict)  # {game_id: {guesser_name: sentence}}
 game_leaderboard = defaultdict(dict)
 round_leaderboard = defaultdict(dict)
-
-MAX_SCORE = 10
+game_timeout = defaultdict(lambda: DEFAULT_TIMEOUT)
 
 game_rules = """
     1. We have N players join the game. N >= 2.
@@ -181,6 +183,7 @@ def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     game_sentences_map[json["game_id"]].clear()
     game_sentences_map[json["game_id"]].append(json["sentence"])
     json["masked_sentence"] = get_masked_sentence(json["sentence"])
+    json["timeout"] = game_timeout[game_id]
     socketio.emit('drawer-submit-event-response', json, callback=message_received, to=game_id)
 
     # TODO: cache (draw's sentence, output image) for faster demo
@@ -262,6 +265,16 @@ def start_new_round(game_id):
 def handle_timer_finish_event(json, methods=['GET', 'POST']):
     logger.info('received timer-finish-event: ' + str(json))
     start_new_round(json["game_id"])
+
+
+@socketio.on('update-time-out-event')
+def handle_update_timeout(json, methods=['GET', 'POST']):
+    logger.info('received update-time-out-event: ' + str(json))
+    timeout = int(json["timeout"])
+    assert timeout > 0
+    game_id = json["game_id"]
+    game_timeout[game_id] = timeout
+    socketio.emit("update-time-out-event-response", json, callback=message_received, to=game_id)
 
 
 #######################################################################

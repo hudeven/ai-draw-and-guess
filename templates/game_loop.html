@@ -50,7 +50,7 @@
     </span>
 </font>
 
-<form action="" method="POST">
+<form id="input_sentence_form" action="" method="POST">
     <input type="text" id="input_sentence" placeholder="Enter a sentence" style="width: 600px"/>
     <input type="submit"/>
 </form>
@@ -60,14 +60,23 @@
 <div id="game_leaderboard"></div>
 
 <br><br><br><br><br><br><br><br>
-<div id="log_display" style="width:600px;height:100px;line-height:1em;overflow:auto;padding:5px;border:4px double;background-color:#E8E8E8">
+<div id="control_panel" style="width:600px;height:100px;line-height:1em;overflow:auto;padding:5px;border:4px double;background-color:#E8E8E8">
     <h2>Control Panel</h2>
-    <label for="models">Choose a model:</label>
-    <select id="model_name">
-      <option value="dalle_mega">DALL·E mega (torchserve)</option>
-      <option value="dalle_mini">DALL·E mini (torchserve)</option>
-      <option value="dalle_mini_local">DALL·E mini (progressive prediction)</option>
-    </select>
+    <div>
+        <label for="model_name">Choose a model:</label>
+        <select id="model_name">
+        <option value="dalle_mega">DALL·E mega (torchserve)</option>
+        <option value="dalle_mini">DALL·E mini (torchserve)</option>
+        <option value="dalle_mini_local">DALL·E mini (progressive prediction)</option>
+        </select>
+    </div>
+    <div>
+        <form id="timeout_form" action="" method="POST">
+            <label for="timeout_sec">Set timeout</label>
+            <input type="text" id="timeout_sec" placeholder="Enter seconds" style="width: 100px"/>
+            <input type="submit"/>
+        </form>
+    </div>
 </div>
     
 <script type="text/javascript">
@@ -84,7 +93,7 @@
         socket.emit('join-room-event', {game_id: game_id, user_name: user_name})
     })
     
-    $('form').on('submit', function(e) {
+    $('#input_sentence_form').on('submit', function(e) {
       e.preventDefault()
       var sentence = $('#input_sentence').val()
       // as #drawer_name might be updated, we need to get the lastest value
@@ -93,6 +102,7 @@
             // display and hide timer
             if (timer != null) {
                 clearInterval(timer)
+                timer = null
                 $("#timer_display").empty()
             }
             var model_name = $('#model_name').val()
@@ -110,7 +120,6 @@
                 sentence: sentence,
             })
       }
-
       $('#input_sentence').val('').focus()
     })
 
@@ -129,8 +138,8 @@
         // only drawer will send "timer-finish-event" to server. otherwise, multiple events from all players will be sent
         var is_send = user_name == drawer_name
         var round_id = $("#round_id").text()
-        timer = activate_count_down_timer(30, is_send, game_id, round_id)
-
+        timer = activate_count_down_timer(msg.timeout, is_send, game_id, round_id)
+        $('#timeout_sec').html(msg.timeout)
     })
 
     socket.on('ai-returns-image-event', function(data) {
@@ -172,8 +181,11 @@
     socket.on('start-new-round-event', function(msg) {
 
         // display and hide timer
-        clearInterval(timer)
-        $("#timer_display").empty()
+        if (timer != null) {
+            clearInterval(timer)
+            timer = null
+            $("#timer_display").empty()
+        }
 
         $('#round_id').text(msg.round_id)
         $('#drawer_name').text(msg.new_drawer_name)
@@ -219,6 +231,26 @@
             $("#input_sentence").prop("disabled", true)
             $('#guide_display').html(`Drawer <b>${msg.new_drawer_name}</b> is typing a sentence...`)
         }
+    })
+
+    $('#timeout_form').on('submit', function(e) {
+      e.preventDefault()
+      var timeout = $('#timeout_sec').val()
+      var drawer_name = $('#drawer_name').text()
+      if (drawer_name == user_name) {
+            // display and hide timer
+            console.log(`update timeout to : ${timeout}`)
+            socket.emit('update-time-out-event', {
+                game_id: game_id,
+                timeout: timeout,
+            })
+      } else {
+            alert(`only drawer ${drawer_name} can update timeout`)
+      }
+    })
+
+    socket.on('update-time-out-event-response', function(msg) {
+        $('#log_display').append(`<div>Timeout is updated to <b>${msg.timeout}</b></div>`)
     })
 
 </script>
