@@ -60,7 +60,7 @@
 <div id="game_leaderboard"></div>
 
 <br><br><br><br><br><br><br><br>
-<div id="control_panel" style="width:600px;height:100px;line-height:1em;overflow:auto;padding:5px;border:4px double;background-color:#E8E8E8">
+<div id="control_panel" style="width:600px;height:150px;line-height:1em;overflow:auto;padding:5px;border:4px double;background-color:#E8E8E8">
     <h2>Control Panel</h2>
     <div>
         <label for="model_name">Choose a model </label>
@@ -74,6 +74,13 @@
         <form id="timeout_form" action="" method="POST">
             <label for="timeout_sec">Set timeout </label>
             <input type="text" id="timeout_sec" placeholder="Enter seconds" style="width: 100px"/>
+            <input type="submit"/>
+        </form>
+    </div>
+    <div>
+        <form id="kickout_form" action="" method="POST">
+            <label for="player_to_kickout">Kickout a player </label>
+            <input type="text" id="player_to_kickout" placeholder="Enter a player name" style="width: 150px"/>
             <input type="submit"/>
         </form>
     </div>
@@ -251,6 +258,21 @@
 
     socket.on('update-time-out-event-response', function(msg) {
         $('#log_display').append(`<div>Timeout is updated to <b>${msg.timeout}</b></div>`)
+        $('#log_display').scrollTop($('#log_display')[0].scrollHeight)
+    })
+
+    $('#kickout_form').on('submit', function(e) {
+        e.preventDefault()
+        var player_to_kickout = $('#player_to_kickout').val()
+        // display and hide timer
+        console.log(`kicking out: ${player_to_kickout}`)
+        
+        socket.emit('kickout-event', {game_id: game_id, player_to_kickout: player_to_kickout})
+    })
+
+    socket.on('kickout-event-response', function(msg) {
+        $('#log_display').append(`<div>${msg.player_to_kickout} is kicked out!</div>`)
+        $('#log_display').scrollTop($('#log_display')[0].scrollHeight)
     })
 
 </script>

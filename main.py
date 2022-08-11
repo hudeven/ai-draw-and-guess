@@ -236,7 +236,7 @@ def handle_guesser_submit_event(json, methods=['GET', 'POST']):
         start_new_round(game_id)
 
 
-def start_new_round(game_id):
+def start_new_round(game_id, reshuffle=False):
     drawer_name = get_drawer(game_id, round_id_map[game_id])
     drawer_score = get_drawer_score(game_id)
     update_leaderboards(game_id, drawer_name, drawer_score)
@@ -257,7 +257,7 @@ def start_new_round(game_id):
     # setup context for the new round
     round_id_map[game_id] += 1
     json["round_id"] = round_id_map[game_id]
-    json["new_drawer_name"] = select_drawer(game_id, round_id=round_id_map[game_id])
+    json["new_drawer_name"] = select_drawer(game_id, round_id=round_id_map[game_id], reshuffle=reshuffle)
     socketio.emit("start-new-round-event", json, callback=message_received, to=game_id)
 
 
@@ -276,6 +276,22 @@ def handle_update_timeout(json, methods=['GET', 'POST']):
     game_timeout[game_id] = timeout
     socketio.emit("update-time-out-event-response", json, callback=message_received, to=game_id)
 
+
+@socketio.on('kickout-event')
+def handle_kickout_event(json):
+    logger.info('handle kickout-event: ' + str(json))
+    game_id = json["game_id"]
+    player_to_kickout = json["player_to_kickout"]
+    
+    for i in range(len(game_players_map[game_id])):
+        if game_players_map[game_id][i] == player_to_kickout:
+            del game_players_map[game_id][i]
+            break
+
+    socketio.emit("kickout-event-response", json, callback=message_received, to=game_id)
+    logger.info(f"Player {player_to_kickout} is kicked out, starting a new round...")
+
+    start_new_round(game_id, reshuffle=True)
 
 #######################################################################
 #                         helper functions                            #
@@ -351,9 +367,9 @@ def update_leaderboards(game_id, user_name, score):
         round_leaderboard[game_id][user_name] = score
 
 
-def select_drawer(game_id, round_id):
+def select_drawer(game_id, round_id, reshuffle=False):
     round_id = int(round_id)
-    if round_id == 0:
+    if round_id == 0 or reshuffle:
         random.seed(0)
         players = game_players_map[game_id]
         game_drawers_shuffled_map[game_id] = random.sample(players, len(players))
