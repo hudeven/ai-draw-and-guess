@@ -177,6 +177,7 @@ def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     game_id = json["game_id"]
     game_sentences_map[json["game_id"]].clear()
     game_sentences_map[json["game_id"]].append(json["sentence"])
+    json["masked_sentence"] = get_masked_sentence(json["sentence"])
     socketio.emit('drawer-submit-event-response', json, callback=message_received, to=game_id)
 
     # TODO: cache (draw's sentence, output image) for faster demo
@@ -346,6 +347,9 @@ def get_encoded_img(img):
     encoded_img = base64.encodebytes(img).decode('ascii')
     return encoded_img
 
+
+def get_masked_sentence(sentence):
+    return "".join([" " if c == " " else "*" for c in sentence])
 
 #######################################################################
 #                   Build tokenizer and model                         #

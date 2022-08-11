@@ -98,7 +98,7 @@
         $("#input_sentence").prop("disabled", false)
         
         $('#log_display').append(
-            `<div>Drawer <b>${msg.drawer_name}</b>: I submitted a sentence</div>`
+            `<div>Drawer <b>${msg.drawer_name}</b>: I submitted sentence: <b style="color: green">${msg.masked_sentence}</b></div>`
         )
         $('#log_display').scrollTop($('#log_display')[0].scrollHeight)
 
