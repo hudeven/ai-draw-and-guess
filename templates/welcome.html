@@ -19,8 +19,11 @@
 <h2>Welcome <span id="user_name">{{ user_name }}</span></h2>
 <button id="create_game">Create a game</button>
 <h3> Or </h3>
-<input type="text" id="game_id" placeholder="Enter the game id"/>
-<button id="join_game">Join a game</button>
+<form id="join_game" method="POST">
+    <input type="text" id="game_id" placeholder="Enter the game id"/>
+    <!-- <button id="join_game">Join a game</button> -->
+    <input type="submit" value="Join a game"/>
+</form>
     
 <script type="text/javascript">
     $('#create_game').on('click', function(e) {
@@ -29,7 +32,8 @@
         window.location = `/create_game/${game_id}/${user_name}`
     })
 
-    $('#join_game').on('click', function(e) {
+    $('#join_game').on('submit', function(e) {
+        e.preventDefault()
         var game_id = $('#game_id').val()
         var user_name = $('#user_name').text()
         window.location = `/join_game/${game_id}/${user_name}`
