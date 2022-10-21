@@ -26,7 +26,7 @@ from modeling.models.dalle.dalle import (
 #######################################################################
 
 MAX_SCORE = 10
-DEFAULT_TIMEOUT = 60
+DEFAULT_TIMEOUT = 120
 
 config = {
     "DEBUG": True,          # some Flask specific configs
@@ -196,6 +196,8 @@ def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     if images is None:
         if model_name == "dalle_mini_local":
             images = predict_from_local_model(model_name, input_text)
+        elif model_name == "diff_online":
+            images = predict_from_stability(model_name, input_text)
         else:
             images = predict_from_torchserve(model_name, input_text)
     
@@ -205,7 +207,7 @@ def handle_drawer_submit_event(json, methods=['GET', 'POST']):
     
     # cache the result for fast demo or debugging
     if not cache.get(cache_key):
-        cache.set(cache_key, [image])
+        cache.set(cache_key, [images])
 
 
 @socketio.on('guesser-submit-event')
@@ -298,6 +300,13 @@ def handle_kickout_event(json):
 #                         helper functions                            #
 #######################################################################
 
+def predict_from_stability(model_name, input_text):
+    logger.info(f'start tokenization, model: {model_name}, input_text: {input_text}')
+    from modeling.stable_diffusion.client import predict
+
+    images = predict(input_text)
+    return images
+
 
 def predict_from_torchserve(model_name, input_text):
     logger.info(f'start tokenization, model: {model_name}, input_text: {input_text}')
@@ -328,6 +337,7 @@ def predict_from_local_model(model_name, input_text):
         is_seamless= False,
         is_verbose= True,
     )
+    import pdb; pdb.set_trace()
     return post_process(images)
 
 
